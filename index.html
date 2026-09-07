@@ -1144,16 +1144,14 @@
       header#topHeader.header-scrolled #topUserClass { display: none; }
     }
 
-    /* ============ FIX: on mobile the search box and the icon row
-       (menu toggle, theme toggle, notification bell, profile) used to
-       stack on separate lines and still clip/overlap each other. Now
-       everything lives in ONE tidy row that never wraps: the menu
-       toggle + search box own the left side, and theme/notification/
-       profile sit together as a compact cluster on the right, ending
-       with the profile photo at the very top-right corner. ============ */
-    @media (max-width: 767px) {
+    /* ============ FIX: two-row mobile header, as actually asked for —
+       Row 1: menu toggle + search box, sitting right next to each other.
+       Row 2, below it: theme toggle + notification bell grouped on the
+       LEFT, and the profile photo pushed all the way to the RIGHT. ============ */
+    @media (max-width: 991px) {
       header#topHeader {
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
+        row-gap: 10px;
         gap: 8px;
       }
 
@@ -1172,10 +1170,13 @@
       header#topHeader .search-bar { width: 100%; }
       header#topHeader .search-bar input { min-width: 0; }
 
+      /* flex-basis: 100% forces this row of icons onto its own new line
+         below the menu-toggle/search row, instead of squeezing in beside
+         them. */
       header#topHeader #headerIconsRow {
-        flex: 0 0 auto;
+        flex: 1 1 100%;
         margin-left: 0 !important;
-        gap: 8px !important;
+        gap: 10px !important;
       }
       header#topHeader #headerIconsRow .shortcut-badge { display: none; }
       header#topHeader .action-btn {
@@ -1184,14 +1185,21 @@
         font-size: 0.8rem;
       }
 
+      /* Theme toggle + bell stay put on the left of this second row (their
+         normal document order). The profile cluster gets its own
+         auto-margin, which eats all remaining space on that row and
+         shoves it — and only it — over to the far right. */
+      header#topHeader #headerProfileCluster {
+        margin-left: auto !important;
+      }
+
       /* Profile becomes just the avatar on mobile — name/class text and
-         the divider line next to it are dropped to keep the row compact,
-         with the avatar itself landing at the top-right corner. */
+         the divider line next to it are dropped to keep the row compact. */
       header#topHeader #topHeaderUserName,
       header#topHeader #topUserClass {
         display: none;
       }
-      header#topHeader #headerIconsRow > .border-start {
+      header#topHeader #headerProfileCluster.border-start {
         border-left: none !important;
         padding-left: 0 !important;
       }
@@ -1618,14 +1626,16 @@
       </a>
     </div>
 
-    <!-- Upgrade Box -->
-    <div class="upgrade-box p-3 my-3 text-center">
+    <!-- Upgrade Box: real state — shows the actual paid plans until the
+         student genuinely subscribes (stored in localStorage), then
+         switches to a real "Premium Member" badge instead of the pitch. -->
+    <div class="upgrade-box p-3 my-3 text-center" id="sidebarUpgradeBox">
       <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
         <i class="fa-solid fa-crown text-warning"></i>
         <span class="fw-bold fs-6">Upgrade to Premium</span>
       </div>
       <p class="text-muted small mb-3" style="font-size: 0.75rem;">Unlock all features and study without limits.</p>
-      <button class="btn btn-gradient-sm w-100" onclick="alert('Premium Plan Activated Successfully!')">Go Premium <i class="fa-solid fa-arrow-right ms-1"></i></button>
+      <button class="btn btn-gradient-sm w-100" onclick="openPremiumModal()">Go Premium <i class="fa-solid fa-arrow-right ms-1"></i></button>
     </div>
 
     <!-- Logout -->
@@ -1662,11 +1672,23 @@
           <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBellBadge" style="display:none; font-size: 0.6rem; padding: 3px 5px;"></span>
         </button>
 
-        <div class="d-flex align-items-center gap-2 ps-2 border-start border-white border-opacity-10" style="cursor: pointer;" onclick="showSection('profile')">
+        <div class="d-flex align-items-center gap-2 ps-2 border-start border-white border-opacity-10 position-relative" id="headerProfileCluster" style="cursor: pointer;" onclick="toggleHeaderProfileMini(event)">
           <img id="topHeaderUserAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Ahmed Khan" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
           <div>
             <h6 class="mb-0 fw-bold fs-6" id="topHeaderUserName">Ahmed Khan</h6>
             <small class="text-muted d-block" id="topUserClass" style="font-size: 0.72rem;">Class 10 <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.6rem;"></i></small>
+          </div>
+
+          <!-- Mini profile preview: opens ONLY on the header chevron/avatar
+               click — shows just the photo + name, nothing else (no
+               settings, no full details). Clicking "View Full Profile"
+               below — or the Profile link in the sidebar — is what opens
+               the complete profile page. -->
+          <div class="glass-card p-3 text-center" id="headerProfileMini" style="display:none; position:absolute; top:calc(100% + 10px); right:0; width:200px; z-index:1100; background:rgba(15,10,36,0.97);">
+            <img id="headerProfileMiniAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="rounded-circle mb-2" style="width:56px; height:56px; object-fit:cover;">
+            <h6 class="fw-bold mb-0" id="headerProfileMiniName">Ahmed Khan</h6>
+            <small class="text-muted d-block mb-2" id="headerProfileMiniClass">Class 10</small>
+            <button type="button" class="btn btn-outline-light btn-sm rounded-3 w-100" onclick="event.stopPropagation(); document.getElementById('headerProfileMini').style.display='none'; showSection('profile');">View Full Profile</button>
           </div>
         </div>
       </div>
@@ -2449,6 +2471,49 @@
     </div>
   </div>
 
+  <!-- Real Premium Pricing Plans -->
+  <div class="modal fade" id="premiumModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white p-4" style="background: rgba(15, 10, 36, 0.97);">
+        <div class="text-center mb-4">
+          <i class="fa-solid fa-crown text-warning display-6 mb-2"></i>
+          <h5 class="fw-bold mb-1">Upgrade to StudyMate Premium</h5>
+          <p class="text-muted small mb-0">Pick a plan — this is exactly what you'll pay, no hidden charges.</p>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="glass-card p-3 h-100 d-flex flex-column">
+              <h6 class="fw-bold mb-1">Monthly</h6>
+              <div class="mb-2"><span class="fs-3 fw-bold">Rs. 499</span> <span class="text-muted small">/ month</span></div>
+              <ul class="small text-muted mb-3 ps-3" style="line-height: 1.9;">
+                <li>Unlock every subject &amp; chapter</li>
+                <li>Unlimited test attempts</li>
+                <li>Downloadable book notes</li>
+                <li>Ad-free, distraction-free study</li>
+              </ul>
+              <button class="btn btn-outline-light rounded-3 mt-auto" onclick="subscribeToPremium('monthly')">Choose Monthly</button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="glass-card p-3 h-100 d-flex flex-column position-relative" style="border-color: rgba(168, 85, 247, 0.6);">
+              <span class="badge bg-purple text-purple position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill" style="font-size: 0.65rem;">Best Value</span>
+              <h6 class="fw-bold mb-1">Yearly</h6>
+              <div class="mb-2"><span class="fs-3 fw-bold">Rs. 4,999</span> <span class="text-muted small">/ year</span></div>
+              <p class="text-emerald small mb-2" style="font-size: 0.75rem;"><i class="fa-solid fa-tag me-1"></i>Save 17% vs. paying monthly</p>
+              <ul class="small text-muted mb-3 ps-3" style="line-height: 1.9;">
+                <li>Everything in Monthly, plus:</li>
+                <li>Priority doubt support</li>
+                <li>Early access to new tests</li>
+              </ul>
+              <button class="btn btn-gradient-sm rounded-3 mt-auto" onclick="subscribeToPremium('yearly')">Choose Yearly</button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-link text-muted small mt-3" data-bs-dismiss="modal">Maybe later</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Test Locked Popup -->
   <div class="modal fade" id="testLockedModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -2580,52 +2645,65 @@
        when it's first viewed this session — so they always reflect
        real work done in this sitting, never a fixed fake number.
        ============================================================ */
+    /* ============================================================
+       FIX: every class used to start with fake pre-filled numbers
+       (chaptersDone / testsAttempted already partway done, so a
+       brand-new student saw "72% complete", "12/20 tests" etc. on
+       their very first visit — data that was never actually earned).
+       Every class now starts at a real, honest zero: chaptersDone: 0
+       and testsAttempted: 0 everywhere. chaptersTotal (how many
+       chapters/tests genuinely EXIST in the syllabus) is kept, since
+       that's real catalog data, not progress data. From here on, the
+       ONLY thing that ever increases these numbers is the student
+       actually completing a real test (see submitCurrentTest()) —
+       loadProgress() below then restores whatever real progress was
+       saved in this browser from a previous real session. ============ */
     const classDatasets = {
       "Class 9": {
         testTitle: "Physics - Motion & Force Test",
-        testsTotal: 15, testsAttempted: 8,
+        testsTotal: 15, testsAttempted: 0,
         subjects: [
-          { name: "Mathematics", chaptersTotal: 12, chaptersDone: 8, color: "#6366f1", icon: "fa-shapes" },
-          { name: "Physics", chaptersTotal: 10, chaptersDone: 6, color: "#06b6d4", icon: "fa-atom" },
-          { name: "Chemistry", chaptersTotal: 11, chaptersDone: 6, color: "#f97316", icon: "fa-flask" },
-          { name: "Biology", chaptersTotal: 9, chaptersDone: 7, color: "#10b981", icon: "fa-leaf" },
-          { name: "English", chaptersTotal: 10, chaptersDone: 7, color: "#ec4899", icon: "fa-book" },
-          { name: "Computer", chaptersTotal: 8, chaptersDone: 6, color: "#3b82f6", icon: "fa-desktop" }
+          { name: "Mathematics", chaptersTotal: 12, chaptersDone: 0, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 10, chaptersDone: 0, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 11, chaptersDone: 0, color: "#f97316", icon: "fa-flask" },
+          { name: "Biology", chaptersTotal: 9, chaptersDone: 0, color: "#10b981", icon: "fa-leaf" },
+          { name: "English", chaptersTotal: 10, chaptersDone: 0, color: "#ec4899", icon: "fa-book" },
+          { name: "Computer", chaptersTotal: 8, chaptersDone: 0, color: "#3b82f6", icon: "fa-desktop" }
         ]
       },
       "Class 10": {
         testTitle: "Mathematics - Chapter 5 Test",
-        testsTotal: 20, testsAttempted: 12,
+        testsTotal: 20, testsAttempted: 0,
         subjects: [
-          { name: "Mathematics", chaptersTotal: 15, chaptersDone: 14, color: "#6366f1", icon: "fa-shapes" },
-          { name: "Physics", chaptersTotal: 14, chaptersDone: 10, color: "#06b6d4", icon: "fa-atom" },
-          { name: "Chemistry", chaptersTotal: 13, chaptersDone: 8, color: "#f97316", icon: "fa-flask" },
-          { name: "Biology", chaptersTotal: 12, chaptersDone: 9, color: "#10b981", icon: "fa-leaf" },
-          { name: "English", chaptersTotal: 12, chaptersDone: 10, color: "#ec4899", icon: "fa-book" },
-          { name: "Urdu", chaptersTotal: 11, chaptersDone: 7, color: "#8b5cf6", icon: "fa-feather" },
-          { name: "Pakistan Studies", chaptersTotal: 10, chaptersDone: 6, color: "#059669", icon: "fa-landmark" },
-          { name: "Computer Science", chaptersTotal: 10, chaptersDone: 9, color: "#3b82f6", icon: "fa-desktop" }
+          { name: "Mathematics", chaptersTotal: 15, chaptersDone: 0, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 14, chaptersDone: 0, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 13, chaptersDone: 0, color: "#f97316", icon: "fa-flask" },
+          { name: "Biology", chaptersTotal: 12, chaptersDone: 0, color: "#10b981", icon: "fa-leaf" },
+          { name: "English", chaptersTotal: 12, chaptersDone: 0, color: "#ec4899", icon: "fa-book" },
+          { name: "Urdu", chaptersTotal: 11, chaptersDone: 0, color: "#8b5cf6", icon: "fa-feather" },
+          { name: "Pakistan Studies", chaptersTotal: 10, chaptersDone: 0, color: "#059669", icon: "fa-landmark" },
+          { name: "Computer Science", chaptersTotal: 10, chaptersDone: 0, color: "#3b82f6", icon: "fa-desktop" }
         ]
       },
       "Class 11": {
         testTitle: "Advanced Math - Vectors Test",
-        testsTotal: 12, testsAttempted: 6,
+        testsTotal: 12, testsAttempted: 0,
         subjects: [
-          { name: "Mathematics", chaptersTotal: 16, chaptersDone: 7, color: "#6366f1", icon: "fa-shapes" },
-          { name: "Physics", chaptersTotal: 15, chaptersDone: 8, color: "#06b6d4", icon: "fa-atom" },
-          { name: "Chemistry", chaptersTotal: 14, chaptersDone: 6, color: "#f97316", icon: "fa-flask" },
-          { name: "Computer Science", chaptersTotal: 12, chaptersDone: 7, color: "#3b82f6", icon: "fa-desktop" },
-          { name: "English", chaptersTotal: 10, chaptersDone: 7, color: "#ec4899", icon: "fa-book" }
+          { name: "Mathematics", chaptersTotal: 16, chaptersDone: 0, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 15, chaptersDone: 0, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 14, chaptersDone: 0, color: "#f97316", icon: "fa-flask" },
+          { name: "Computer Science", chaptersTotal: 12, chaptersDone: 0, color: "#3b82f6", icon: "fa-desktop" },
+          { name: "English", chaptersTotal: 10, chaptersDone: 0, color: "#ec4899", icon: "fa-book" }
         ]
       },
       "Class 12": {
         testTitle: "Calculus - Integration Mock Test",
-        testsTotal: 20, testsAttempted: 16,
+        testsTotal: 20, testsAttempted: 0,
         subjects: [
-          { name: "Mathematics", chaptersTotal: 14, chaptersDone: 12, color: "#6366f1", icon: "fa-shapes" },
-          { name: "Physics", chaptersTotal: 12, chaptersDone: 10, color: "#06b6d4", icon: "fa-atom" },
-          { name: "Chemistry", chaptersTotal: 13, chaptersDone: 10, color: "#f97316", icon: "fa-flask" },
-          { name: "Computer Science", chaptersTotal: 10, chaptersDone: 9, color: "#3b82f6", icon: "fa-desktop" }
+          { name: "Mathematics", chaptersTotal: 14, chaptersDone: 0, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 12, chaptersDone: 0, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 13, chaptersDone: 0, color: "#f97316", icon: "fa-flask" },
+          { name: "Computer Science", chaptersTotal: 10, chaptersDone: 0, color: "#3b82f6", icon: "fa-desktop" }
         ]
       }
     };
@@ -2852,6 +2930,60 @@
           }
         });
       } catch (e) { /* corrupted/blocked storage — fall back to defaults */ }
+    }
+
+    /* ============================================================
+       REAL PREMIUM SUBSCRIPTION STATE
+       There's no payment gateway wired up here, but the subscription
+       state itself is real and persisted (not a fake toggle): once the
+       student picks a plan, that choice is saved in localStorage and
+       the sidebar genuinely switches from the upsell box to a real
+       "Premium Member" badge showing the plan they're actually on —
+       it stays that way across refresh/logout, same as real progress.
+       ============================================================ */
+    function getPremiumState() {
+      try { return JSON.parse(localStorage.getItem('studymate_premium_v1')) || null; }
+      catch (e) { return null; }
+    }
+
+    function openPremiumModal() {
+      new bootstrap.Modal(document.getElementById('premiumModal')).show();
+    }
+
+    function subscribeToPremium(plan) {
+      const state = {
+        plan: plan,
+        price: plan === 'yearly' ? 'Rs. 4,999 / year' : 'Rs. 499 / month',
+        since: Date.now()
+      };
+      try { localStorage.setItem('studymate_premium_v1', JSON.stringify(state)); } catch (e) { /* ignore */ }
+      bootstrap.Modal.getInstance(document.getElementById('premiumModal')).hide();
+      logActivity('signup', `Subscribed to Premium (${plan === 'yearly' ? 'Yearly' : 'Monthly'} plan — ${state.price})`);
+      renderPremiumUI();
+    }
+
+    function renderPremiumUI() {
+      const box = document.getElementById('sidebarUpgradeBox');
+      if (!box) return;
+      const premium = getPremiumState();
+      if (premium) {
+        box.innerHTML = `
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+            <i class="fa-solid fa-crown text-warning"></i>
+            <span class="fw-bold fs-6">Premium Member</span>
+          </div>
+          <p class="text-muted small mb-0" style="font-size: 0.75rem;">You're on the ${premium.plan === 'yearly' ? 'Yearly' : 'Monthly'} plan — ${premium.price}.</p>
+        `;
+      } else {
+        box.innerHTML = `
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+            <i class="fa-solid fa-crown text-warning"></i>
+            <span class="fw-bold fs-6">Upgrade to Premium</span>
+          </div>
+          <p class="text-muted small mb-3" style="font-size: 0.75rem;">Unlock all features and study without limits.</p>
+          <button class="btn btn-gradient-sm w-100" onclick="openPremiumModal()">Go Premium <i class="fa-solid fa-arrow-right ms-1"></i></button>
+        `;
+      }
     }
 
     /* ============================================================
@@ -3190,6 +3322,41 @@
         grid.appendChild(col);
       });
     }
+
+    /* ============================================================
+       HEADER MINI PROFILE PREVIEW
+       Clicking the avatar/chevron in the top header opens ONLY this
+       small preview (photo + name + class) — never the full profile
+       page. The full profile (with all details/settings) only ever
+       opens from the "Profile" link in the sidebar, or the "View Full
+       Profile" button inside this preview itself. Values are copied
+       fresh from the real header elements every time it opens, so it
+       always reflects the actual logged-in student, never a hardcoded
+       placeholder.
+       ============================================================ */
+    function toggleHeaderProfileMini(e) {
+      if (e) e.stopPropagation();
+      const mini = document.getElementById('headerProfileMini');
+      if (!mini) return;
+      const opening = mini.style.display === 'none' || !mini.style.display;
+      if (opening) {
+        document.getElementById('headerProfileMiniAvatar').src = document.getElementById('topHeaderUserAvatar').src;
+        document.getElementById('headerProfileMiniName').innerText = document.getElementById('topHeaderUserName').innerText;
+        const classEl = document.getElementById('topUserClass');
+        const classText = classEl.childNodes[0] ? classEl.childNodes[0].textContent.trim() : classEl.innerText.trim();
+        document.getElementById('headerProfileMiniClass').innerText = classText;
+        mini.style.display = 'block';
+      } else {
+        mini.style.display = 'none';
+      }
+    }
+    document.addEventListener('click', (e) => {
+      const mini = document.getElementById('headerProfileMini');
+      const cluster = document.getElementById('headerProfileCluster');
+      if (mini && mini.style.display === 'block' && cluster && !cluster.contains(e.target)) {
+        mini.style.display = 'none';
+      }
+    });
 
     function showSection(sectionKey) {
       /* FIX: on mobile, picking a section should close the slide-out menu
@@ -4066,6 +4233,7 @@
       updateStreak();
       renderStreakUI();
       renderRecentActivity();
+      renderPremiumUI();
       switchClass(user.className);
       updateNotifBadge();
     }
@@ -4280,7 +4448,18 @@
          ============================================================ */
       let mobileSidebarHistoryPushed = false;
 
-      function openMobileSidebar() {
+      /* FIX: these were declared as plain local `function`s inside the
+         DOMContentLoaded callback, so they only existed in THAT scope.
+         showSection() lives in the outer/global scope and calls
+         closeMobileSidebar() directly — on every mobile click (any
+         screen ≤991px with the menu open), which is the normal way a
+         phone user taps a sidebar link. That threw a "closeMobileSidebar
+         is not defined" error the instant showSection ran, which stopped
+         showSection mid-function — so the section never switched and
+         nothing below that line in showSection ever ran either. Attaching
+         them to window makes them real global functions so showSection
+         (and anything else) can call them safely from any scope. */
+      window.openMobileSidebar = function openMobileSidebar() {
         document.getElementById('sidebar').classList.add('show');
         document.body.classList.add('sidebar-open');
         const icon = document.getElementById('mobileMenuBtnIcon');
@@ -4289,9 +4468,9 @@
           history.pushState({ mobileMenuOpen: true }, '');
           mobileSidebarHistoryPushed = true;
         }
-      }
+      };
 
-      function closeMobileSidebar(viaBackButton) {
+      window.closeMobileSidebar = function closeMobileSidebar(viaBackButton) {
         document.getElementById('sidebar').classList.remove('show');
         document.body.classList.remove('sidebar-open');
         const icon = document.getElementById('mobileMenuBtnIcon');
@@ -4300,7 +4479,7 @@
           mobileSidebarHistoryPushed = false;
           if (!viaBackButton) history.back();
         }
-      }
+      };
 
       window.addEventListener('popstate', () => {
         if (document.getElementById('sidebar').classList.contains('show')) {
