@@ -411,7 +411,10 @@
       background: var(--sidebar-bg);
       backdrop-filter: blur(25px);
       border-right: 1px solid var(--card-border);
-      min-height: 100vh;
+      height: 100vh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       position: fixed;
       top: 0;
       left: 0;
@@ -1060,20 +1063,40 @@
       .sidebar { left: -270px; }
       .sidebar.show { left: 0; }
       .main-wrapper { margin-left: 0; }
+
+      /* FIX: background page must not scroll behind the open mobile menu —
+         lock it while the sidebar is open. */
+      body.sidebar-open { overflow: hidden; height: 100vh; }
+
+      /* FIX: dim/blocking backdrop behind the open mobile menu so taps
+         land on the menu (or close it), not on the page underneath. */
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(5, 2, 20, 0.55);
+        z-index: 1040;
+      }
+      body.sidebar-open .sidebar-backdrop { display: block; }
     }
 
     /* ============ FIX: header (search box, notification, theme toggle,
        profile) used to scroll away with the page. Now it sticks to the top,
        and once you actually scroll down it gets its own small, cute floating
        pill container (blurred glass background, rounded, soft shadow) so it
-       stands out instead of floating loose over the content. Nothing else
-       about the header changes — same icons, same layout, same order. ============ */
+       stands out instead of floating loose over the content. It also hides
+       itself out of the way while scrolling further down on mobile (see the
+       header-hidden rule below), and slides back the moment you scroll up. ============ */
     header#topHeader {
       position: sticky;
       top: 0;
       z-index: 1030;
-      transition: all 0.35s ease;
+      transition: all 0.35s ease, transform 0.3s ease;
       padding: 6px 0;
+    }
+
+    header#topHeader.header-hidden {
+      transform: translateY(-130%);
     }
 
     header#topHeader.header-scrolled {
@@ -1122,33 +1145,64 @@
     }
 
     /* ============ FIX: on mobile the search box and the icon row
-       (theme toggle, notification bell, profile) used to sit side by
-       side and fight for space, causing them to overlap/clip. Now on
-       small screens the icon row (toggle + bell + profile) always
-       renders first as its own full-width single line, and the search
-       box sits cleanly on its own full-width line right underneath —
-       nothing stacks on top of anything else. ============ */
-    @media (max-width: 575px) {
+       (menu toggle, theme toggle, notification bell, profile) used to
+       stack on separate lines and still clip/overlap each other. Now
+       everything lives in ONE tidy row that never wraps: the menu
+       toggle + search box own the left side, and theme/notification/
+       profile sit together as a compact cluster on the right, ending
+       with the profile photo at the very top-right corner. ============ */
+    @media (max-width: 767px) {
       header#topHeader {
-        flex-direction: column;
-        align-items: stretch;
+        flex-wrap: nowrap;
+        gap: 8px;
       }
-      header#topHeader #headerIconsRow {
-        order: -1;
-        width: 100%;
-        margin-left: 0 !important;
-        justify-content: space-between;
+
+      #mobileMenuBtn {
+        flex: 0 0 auto;
+        width: 38px;
+        height: 38px;
+        font-size: 0.85rem;
       }
+
       header#topHeader .search-box-wrapper {
-        width: 100%;
-        max-width: 100% !important;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none !important;
       }
-      header#topHeader .search-bar {
-        width: 100%;
+      header#topHeader .search-bar { width: 100%; }
+      header#topHeader .search-bar input { min-width: 0; }
+
+      header#topHeader #headerIconsRow {
+        flex: 0 0 auto;
+        margin-left: 0 !important;
+        gap: 8px !important;
       }
-      header#topHeader #headerIconsRow .shortcut-badge {
+      header#topHeader #headerIconsRow .shortcut-badge { display: none; }
+      header#topHeader .action-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 0.8rem;
+      }
+
+      /* Profile becomes just the avatar on mobile — name/class text and
+         the divider line next to it are dropped to keep the row compact,
+         with the avatar itself landing at the top-right corner. */
+      header#topHeader #topHeaderUserName,
+      header#topHeader #topUserClass {
         display: none;
       }
+      header#topHeader #headerIconsRow > .border-start {
+        border-left: none !important;
+        padding-left: 0 !important;
+      }
+      header#topHeader #topHeaderUserAvatar {
+        width: 34px !important;
+        height: 34px !important;
+      }
+    }
+
+    @media (max-width: 400px) {
+      header#topHeader .search-bar input::placeholder { font-size: 0.78rem; }
     }
 
     /* ============ FIX: dashboard bottom widgets (Progress Overview,
@@ -1444,14 +1498,50 @@
     </div>
   </div>
 
+  <!-- Deactivate Account Confirm Modal -->
+  <div class="modal fade" id="deactivateAccountModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white" style="background: #171038;">
+        <div class="modal-body text-center py-4">
+          <div class="mx-auto mb-3 d-flex align-items-center justify-content-center" style="width:56px; height:56px; border-radius:50%; background: rgba(245, 158, 11, 0.15);">
+            <i class="fa-solid fa-pause text-warning fs-4"></i>
+          </div>
+          <h5 class="fw-bold mb-1">Deactivate your account?</h5>
+          <p class="text-muted small mb-0">You'll be logged out right away. Logging back in with your email and password reactivates it — nothing is deleted.</p>
+        </div>
+        <div class="modal-footer border-0 justify-content-center pb-4">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning rounded-pill px-4" onclick="confirmDeactivateAccount()" data-bs-dismiss="modal">Yes, Deactivate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permanently Delete Account Confirm Modal -->
+  <div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white" style="background: #171038;">
+        <div class="modal-body text-center py-4">
+          <div class="mx-auto mb-3 d-flex align-items-center justify-content-center" style="width:56px; height:56px; border-radius:50%; background: rgba(239, 68, 68, 0.15);">
+            <i class="fa-solid fa-trash text-danger fs-4"></i>
+          </div>
+          <h5 class="fw-bold mb-1">Permanently delete your account?</h5>
+          <p class="text-muted small mb-0">This removes your account for good and cannot be undone. Type your email below to confirm.</p>
+          <input type="email" id="deleteAccountConfirmEmail" class="form-control profile-input mt-3" placeholder="Type your account email to confirm">
+          <div class="text-danger small mt-2" id="deleteAccountError" style="display:none;"></div>
+        </div>
+        <div class="modal-footer border-0 justify-content-center pb-4">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger rounded-pill px-4" onclick="confirmDeleteAccountPermanently()">Yes, Delete Permanently</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="appShell" style="display:none;">
 
-  <!-- Mobile Toggle -->
-  <div class="position-fixed bottom-0 end-0 m-3 d-lg-none" style="z-index: 1090;">
-    <button class="btn btn-primary rounded-circle p-3 shadow-lg" id="mobileMenuBtn">
-      <i class="fa-solid fa-bars fs-5"></i>
-    </button>
-  </div>
+  <!-- Mobile Sidebar Backdrop -->
+  <div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop"></div>
 
   <!-- Sidebar Navigation -->
   <aside class="sidebar p-3 d-flex flex-column" id="sidebar">
@@ -1549,7 +1639,13 @@
     
     <!-- Top Header Navigation -->
     <header class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap" id="topHeader">
-      
+
+      <!-- Mobile Menu Toggle (hidden on desktop, part of the header itself
+           so it scrolls/hides together with it instead of floating on top) -->
+      <button class="action-btn d-lg-none" id="mobileMenuBtn" title="Menu">
+        <i class="fa-solid fa-bars" id="mobileMenuBtnIcon"></i>
+      </button>
+
       <!-- Search Box with Animated Border Line -->
       <div class="search-box-wrapper">
         <div class="search-bar d-flex align-items-center gap-2">
@@ -1968,16 +2064,16 @@
               <h6 class="fw-bold mb-0">Academic Summary</h6>
             </div>
             <div class="academic-stat-row small">
-              <span class="text-muted">Target Grade:</span>
-              <span class="fw-bold text-success">A+ (90%+)</span>
+              <span class="text-muted">Overall Progress:</span>
+              <span class="fw-bold text-success" id="acadOverallProgress">0%</span>
             </div>
             <div class="academic-stat-row small">
-              <span class="text-muted">Current Roll No:</span>
-              <span class="fw-bold text-white">#1042-B</span>
+              <span class="text-muted">Tests Attempted:</span>
+              <span class="fw-bold text-white" id="acadTestsAttempted">0/0</span>
             </div>
             <div class="academic-stat-row small mb-0">
-              <span class="text-muted">Major Group:</span>
-              <span class="fw-bold text-warning">Computer Science</span>
+              <span class="text-muted">Average Test Score:</span>
+              <span class="fw-bold text-warning" id="acadAvgScore">No tests yet</span>
             </div>
           </div>
         </div>
@@ -2093,6 +2189,183 @@
                 <button type="submit" class="btn btn-gradient-sm px-4 py-2"><i class="fa-solid fa-floppy-disk me-1"></i> Save Profile Details</button>
               </div>
             </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: SETTINGS -->
+    <div id="settingsSection" style="display: none;">
+      <div class="profile-page-header-bar d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-outline-light rounded-circle p-2" onclick="showSection('dashboard')" style="width:40px; height:40px;"><i class="fa-solid fa-arrow-left"></i></button>
+          <div class="section-icon-chip chip-purple">
+            <i class="fa-solid fa-gear"></i>
+          </div>
+          <div>
+            <h3 class="fw-bold mb-0">Settings</h3>
+            <small class="text-muted">Appearance, account, and help — all in one place</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-7">
+
+          <!-- Appearance -->
+          <div class="glass-panel p-4 mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <div class="section-icon-chip chip-blue" style="width:36px;height:36px;min-width:36px;font-size:0.95rem;">
+                <i class="fa-solid fa-moon"></i>
+              </div>
+              <h6 class="fw-bold mb-0">Appearance</h6>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <p class="fw-semibold mb-0">Dark / Light Theme</p>
+                <small class="text-muted">Switch how StudyMate looks on this device.</small>
+              </div>
+              <div class="form-check form-switch fs-4 mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="settingsThemeSwitch" checked>
+              </div>
+            </div>
+          </div>
+
+          <!-- Account -->
+          <div class="glass-panel p-4 mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <div class="section-icon-chip chip-green" style="width:36px;height:36px;min-width:36px;font-size:0.95rem;">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <h6 class="fw-bold mb-0">Account</h6>
+            </div>
+
+            <div class="d-flex align-items-center gap-3 mb-4">
+              <img id="settingsUserAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="rounded-circle" style="width:48px;height:48px;object-fit:cover;">
+              <div>
+                <p class="fw-bold mb-0" id="settingsUserName">Ahmed Khan</p>
+                <small class="text-muted" id="settingsUserEmail">ahmed@example.com</small>
+              </div>
+            </div>
+
+            <form id="changePasswordForm" onsubmit="handleChangePassword(event)" class="mb-1">
+              <label class="form-label small fw-semibold text-muted">Change Password</label>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <input type="password" id="settingsCurrentPassword" class="form-control profile-input" placeholder="Current password" required>
+                </div>
+                <div class="col-md-4">
+                  <input type="password" id="settingsNewPassword" class="form-control profile-input" placeholder="New password" minlength="4" required>
+                </div>
+                <div class="col-md-4">
+                  <input type="password" id="settingsConfirmPassword" class="form-control profile-input" placeholder="Confirm new password" minlength="4" required>
+                </div>
+              </div>
+              <div class="text-danger small mt-2" id="changePasswordError" style="display:none;"></div>
+              <button type="submit" class="btn btn-gradient-sm px-4 mt-3"><i class="fa-solid fa-key me-1"></i> Update Password</button>
+            </form>
+
+            <hr class="border-white border-opacity-10 my-4">
+
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div>
+                <p class="fw-semibold mb-0">Logged in as this account</p>
+                <small class="text-muted">Sign out of StudyMate on this device.</small>
+              </div>
+              <a href="#" class="btn btn-outline-light rounded-3" onclick="new bootstrap.Modal(document.getElementById('logoutConfirmModal')).show(); return false;">
+                <i class="fa-solid fa-right-from-bracket me-1"></i> Logout
+              </a>
+            </div>
+          </div>
+
+          <!-- Danger Zone -->
+          <div class="glass-panel p-4 border border-danger border-opacity-25">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <div class="section-icon-chip chip-red" style="width:36px;height:36px;min-width:36px;font-size:0.95rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <h6 class="fw-bold mb-0">Danger Zone</h6>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-3 border-bottom border-white border-opacity-10">
+              <div>
+                <p class="fw-semibold mb-0">Temporarily Deactivate Account</p>
+                <small class="text-muted">Signs you out and locks the account until you log back in and choose to reactivate it.</small>
+              </div>
+              <button class="btn btn-outline-warning rounded-3" onclick="new bootstrap.Modal(document.getElementById('deactivateAccountModal')).show();">Deactivate</button>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div>
+                <p class="fw-semibold mb-0">Permanently Delete Account</p>
+                <small class="text-muted">This removes your account for good — it cannot be undone.</small>
+              </div>
+              <button class="btn btn-outline-danger rounded-3" onclick="new bootstrap.Modal(document.getElementById('deleteAccountModal')).show();">Delete Account</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- FAQ -->
+        <div class="col-lg-5">
+          <div class="glass-panel p-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <div class="section-icon-chip chip-amber" style="width:36px;height:36px;min-width:36px;font-size:0.95rem;">
+                <i class="fa-solid fa-circle-question"></i>
+              </div>
+              <h6 class="fw-bold mb-0">FAQ</h6>
+            </div>
+
+            <div class="accordion accordion-flush" id="settingsFaqAccordion">
+              <div class="accordion-item bg-transparent">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed bg-transparent text-white" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">Is my progress and data saved?</button>
+                </h2>
+                <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#settingsFaqAccordion">
+                  <div class="accordion-body text-muted small">Yes — your chapters, bookmarks, sticky notes, test attempts, and scores are all saved on this device as you use the app, and are still there the next time you open StudyMate on it.</div>
+                </div>
+              </div>
+              <div class="accordion-item bg-transparent">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed bg-transparent text-white" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">How do tests unlock?</button>
+                </h2>
+                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#settingsFaqAccordion">
+                  <div class="accordion-body text-muted small">Each class has a real scheduled test time. The test stays locked until that exact time arrives — it never opens early — and you can always see the countdown from the Notifications or Tests page.</div>
+                </div>
+              </div>
+              <div class="accordion-item bg-transparent">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed bg-transparent text-white" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">How is my Academic Summary calculated?</button>
+                </h2>
+                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#settingsFaqAccordion">
+                  <div class="accordion-body text-muted small">It's calculated live from what you've actually done — chapters completed, tests attempted, and your real average MCQ score across every test you've submitted. It updates automatically as you study.</div>
+                </div>
+              </div>
+              <div class="accordion-item bg-transparent">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed bg-transparent text-white" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">What's the difference between deactivating and deleting my account?</button>
+                </h2>
+                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#settingsFaqAccordion">
+                  <div class="accordion-body text-muted small">Deactivating signs you out and locks the account temporarily — logging back in with your email and password lets you reactivate it. Deleting removes the account permanently and can't be reversed.</div>
+                </div>
+              </div>
+              <div class="accordion-item bg-transparent">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed bg-transparent text-white" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">I forgot my password — what do I do?</button>
+                </h2>
+                <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#settingsFaqAccordion">
+                  <div class="accordion-body text-muted small">Use "Change Password" above if you're already logged in. If you can't log in at all, you'll need to sign up again with the same email once that account is deleted or deactivated.</div>
+                </div>
+              </div>
+              <div class="accordion-item bg-transparent">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed bg-transparent text-white" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">Can I switch between classes?</button>
+                </h2>
+                <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#settingsFaqAccordion">
+                  <div class="accordion-body text-muted small">Yes — use the "Classes" menu in the sidebar to switch between Class 9 to 12. Each class keeps its own subjects, tests, and progress.</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2446,6 +2719,12 @@
       const badgeEl = document.getElementById('genericClassBadge');
       const bodyEl = document.getElementById('genericSectionBody');
 
+      /* Log this as real recent activity — but only for notifications that
+         were genuinely unseen before this open, so re-visiting the page
+         doesn't spam duplicate entries. */
+      const readIdsBeforeOpen = getReadNotificationIds();
+      const newlySeenNotifs = notifs.filter(n => !readIdsBeforeOpen.includes(n.id));
+
       titleEl.innerHTML = `<i class="fa-solid fa-bell me-2 text-warning"></i> Notifications`;
       badgeEl.innerText = notifs.length ? `${notifs.length} Update${notifs.length === 1 ? '' : 's'}` : 'All Caught Up';
 
@@ -2510,6 +2789,10 @@
          so the bell badge clears — exactly the ones actually shown here. */
       markAllNotificationsRead(notifs.map(n => n.id));
       updateNotifBadge();
+
+      newlySeenNotifs.forEach(n => {
+        logActivity('notification', `New test notification: "${n.testTitle}" • ${n.className}`);
+      });
     }
 
     function renderUpcomingTest(className) {
@@ -2662,11 +2945,14 @@
     }
 
     const activityIcons = {
-      signup: { icon: 'fa-user-plus', chip: 'chip-amber' },
-      login:  { icon: 'fa-right-to-bracket', chip: 'chip-blue' },
-      logout: { icon: 'fa-right-from-bracket', chip: 'chip-red' },
-      test:   { icon: 'fa-award', chip: 'chip-purple' },
-      chapter:{ icon: 'fa-check', chip: 'chip-green' }
+      signup:       { icon: 'fa-user-plus', chip: 'chip-amber' },
+      login:        { icon: 'fa-right-to-bracket', chip: 'chip-blue' },
+      logout:       { icon: 'fa-right-from-bracket', chip: 'chip-red' },
+      test:         { icon: 'fa-award', chip: 'chip-purple' },
+      subject:      { icon: 'fa-book', chip: 'chip-green' },
+      chapter:      { icon: 'fa-book-open', chip: 'chip-green' },
+      bookmark:     { icon: 'fa-bookmark', chip: 'chip-pink' },
+      notification: { icon: 'fa-bell', chip: 'chip-blue' }
     };
 
     function renderRecentActivity() {
@@ -2797,10 +3083,58 @@
 
       renderSubjectsGrid(classDatasets[className].subjects);
       renderContinueBanners(className);
+      renderAcademicSummary(className, st);
       saveProgress();
     }
 
+    /* ============================================================
+       REAL ACADEMIC SUMMARY (Profile page)
+       Every value here is computed live from real usage — overall
+       chapter progress, how many tests have actually been attempted,
+       and a real running average MCQ score built from every test the
+       student has genuinely submitted. Nothing is a fixed placeholder,
+       and it refreshes automatically any time stats refresh (class
+       switch, chapter progress, test submission). ============ */
+    function getScoreLog() {
+      try { return JSON.parse(localStorage.getItem('studymate_scores_v1')) || {}; }
+      catch (e) { return {}; }
+    }
+    function saveScoreLog(log) {
+      try { localStorage.setItem('studymate_scores_v1', JSON.stringify(log)); } catch (e) { /* ignore */ }
+    }
+    function recordTestScore(className, correct, possible) {
+      if (!possible) return;
+      const log = getScoreLog();
+      const entry = log[className] || { correct: 0, possible: 0 };
+      entry.correct += correct;
+      entry.possible += possible;
+      log[className] = entry;
+      saveScoreLog(log);
+    }
+
+    function renderAcademicSummary(className, st) {
+      const progressEl = document.getElementById('acadOverallProgress');
+      const testsEl = document.getElementById('acadTestsAttempted');
+      const scoreEl = document.getElementById('acadAvgScore');
+      if (!progressEl || !testsEl || !scoreEl) return;
+
+      const stats = st || getClassStats(className);
+      progressEl.innerText = `${stats.overallPct}%`;
+      testsEl.innerText = `${stats.testsAttempted}/${stats.testsTotal}`;
+
+      const log = getScoreLog()[className];
+      scoreEl.innerText = (log && log.possible > 0)
+        ? `${Math.round((log.correct / log.possible) * 100)}%`
+        : 'No tests yet';
+    }
+
     function switchClass(className) {
+      /* FIX: on mobile, picking a class from the submenu should also
+         close the slide-out menu instead of leaving it open. */
+      if (window.innerWidth <= 991 && document.getElementById('sidebar').classList.contains('show')) {
+        closeMobileSidebar(false);
+      }
+
       currentSelectedClass = className;
       const data = classDatasets[className];
 
@@ -2858,6 +3192,12 @@
     }
 
     function showSection(sectionKey) {
+      /* FIX: on mobile, picking a section should close the slide-out menu
+         instead of leaving it open over the new page. */
+      if (window.innerWidth <= 991 && document.getElementById('sidebar').classList.contains('show')) {
+        closeMobileSidebar(false);
+      }
+
       /* FIX: highlight stays only on "Dashboard" before, since no other sidebar
          button ever received the .active class on click. This keeps whichever
          section is currently open highlighted in the sidebar, no matter
@@ -2871,14 +3211,22 @@
       document.getElementById('genericSection').style.display = 'none';
       document.getElementById('bookViewerSection').style.display = 'none';
       document.getElementById('profileSection').style.display = 'none';
+      document.getElementById('settingsSection').style.display = 'none';
 
       if(sectionKey === 'dashboard') {
         document.getElementById('dashboardSection').style.display = 'block';
         return;
       }
 
-      if(sectionKey === 'profile' || sectionKey === 'settings') {
+      if(sectionKey === 'profile') {
         document.getElementById('profileSection').style.display = 'block';
+        renderAcademicSummary(currentSelectedClass);
+        return;
+      }
+
+      if(sectionKey === 'settings') {
+        document.getElementById('settingsSection').style.display = 'block';
+        renderSettingsSection();
         return;
       }
 
@@ -3275,6 +3623,7 @@
       document.getElementById('dashboardSection').style.display = 'none';
       document.getElementById('genericSection').style.display = 'none';
       document.getElementById('profileSection').style.display = 'none';
+      document.getElementById('settingsSection').style.display = 'none';
       document.getElementById('bookViewerSection').style.display = 'block';
 
       currentBookSubjectName = subjectName;
@@ -3304,7 +3653,7 @@
       /* Opening the book itself is a real, loggable activity — logged once
          here; the very first chapter it auto-selects is opened "silently"
          right after so it doesn't also log a duplicate entry. */
-      logActivity('chapter', `Opened "${subjectName}" book`);
+      logActivity('subject', `Opened "${subjectName}" book`);
       selectChapter(0, `Chapter 1: ${chapterTitleBank[0]}`, { silent: true });
       updateBookProgressUI();
     }
@@ -3429,7 +3778,7 @@
       saveBookmarks();
       updateBookmarkButtonUI();
       renderBookmarksListIfOpen();
-      logActivity('chapter', `Bookmarked page ${currentPage} of "${currentChapterTitle}" • ${currentBookSubjectName}`);
+      logActivity('bookmark', `Bookmarked page ${currentPage} of "${currentChapterTitle}" • ${currentBookSubjectName}`);
     }
 
     function renderBookmarksListIfOpen() {
@@ -3743,7 +4092,7 @@
         return;
       }
 
-      const newUser = { name, email, password, className };
+      const newUser = { name, email, password, className, active: true };
       users.push(newUser);
       saveUsers(users);
       setSession(email);
@@ -3759,18 +4108,30 @@
       const errorBox = document.getElementById('loginErrorBox');
 
       const users = getUsers();
-      const user = users.find(u => u.email.toLowerCase() === email && u.password === password);
+      const userIdx = users.findIndex(u => u.email.toLowerCase() === email && u.password === password);
 
-      if (!user) {
+      if (userIdx === -1) {
         errorBox.innerText = 'Incorrect email or password.';
         errorBox.style.display = 'block';
         return;
+      }
+
+      let user = users[userIdx];
+      let reactivated = false;
+      if (user.active === false) {
+        users[userIdx].active = true;
+        saveUsers(users);
+        user = users[userIdx];
+        reactivated = true;
       }
 
       setSession(user.email);
       errorBox.style.display = 'none';
       logActivity('login', `${user.name} logged in`);
       enterApp(user);
+      if (reactivated) {
+        showUpdateSuccessModal('Welcome back! Your account has been reactivated.');
+      }
     }
 
     function handleLogout() {
@@ -3782,6 +4143,103 @@
       document.getElementById('loginForm').reset();
       document.getElementById('signupForm').reset();
       showAuthForm('login');
+      showAuthScreen();
+    }
+
+    /* ============================================================
+       SETTINGS PAGE: real account details, a working password change,
+       and real (not decorative) deactivate / permanently-delete actions
+       against the actual users list in localStorage.
+       ============================================================ */
+    function renderSettingsSection() {
+      const user = getSessionUser();
+      if (!user) return;
+      document.getElementById('settingsUserName').innerText = user.name;
+      document.getElementById('settingsUserEmail').innerText = user.email;
+      const avatarSrc = document.getElementById('topHeaderUserAvatar').src;
+      document.getElementById('settingsUserAvatar').src = avatarSrc;
+      document.getElementById('changePasswordForm').reset();
+      document.getElementById('changePasswordError').style.display = 'none';
+    }
+
+    function handleChangePassword(e) {
+      e.preventDefault();
+      const errorBox = document.getElementById('changePasswordError');
+      const current = document.getElementById('settingsCurrentPassword').value;
+      const next = document.getElementById('settingsNewPassword').value;
+      const confirm = document.getElementById('settingsConfirmPassword').value;
+
+      const sessionUser = getSessionUser();
+      if (!sessionUser) return;
+
+      if (sessionUser.password !== current) {
+        errorBox.innerText = 'Current password is incorrect.';
+        errorBox.style.display = 'block';
+        return;
+      }
+      if (next !== confirm) {
+        errorBox.innerText = 'New passwords do not match.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const users = getUsers();
+      const idx = users.findIndex(u => u.email.toLowerCase() === sessionUser.email.toLowerCase());
+      if (idx !== -1) {
+        users[idx].password = next;
+        saveUsers(users);
+      }
+      errorBox.style.display = 'none';
+      document.getElementById('changePasswordForm').reset();
+      showUpdateSuccessModal('Your password was updated successfully.');
+    }
+
+    /* Deactivate: real, reversible — flips active:false on the actual
+       user record and signs out. Logging back in with the right email
+       + password flips it back on (see handleLogin). */
+    function confirmDeactivateAccount() {
+      const sessionUser = getSessionUser();
+      if (!sessionUser) return;
+      const users = getUsers();
+      const idx = users.findIndex(u => u.email.toLowerCase() === sessionUser.email.toLowerCase());
+      if (idx !== -1) {
+        users[idx].active = false;
+        saveUsers(users);
+      }
+      logActivity('logout', `${sessionUser.name} deactivated their account`);
+      clearSession();
+      document.getElementById('loginForm').reset();
+      document.getElementById('signupForm').reset();
+      showAuthForm('login');
+      showAuthScreen();
+    }
+
+    /* Permanent delete: real removal from the users list. Requires
+       typing the account email to confirm, same as most real apps. */
+    function confirmDeleteAccountPermanently() {
+      const sessionUser = getSessionUser();
+      if (!sessionUser) return;
+      const typed = document.getElementById('deleteAccountConfirmEmail').value.trim().toLowerCase();
+      const errorBox = document.getElementById('deleteAccountError');
+
+      if (typed !== sessionUser.email.toLowerCase()) {
+        errorBox.innerText = 'Email does not match your account email.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      let users = getUsers();
+      users = users.filter(u => u.email.toLowerCase() !== sessionUser.email.toLowerCase());
+      saveUsers(users);
+      clearSession();
+
+      errorBox.style.display = 'none';
+      document.getElementById('deleteAccountConfirmEmail').value = '';
+      bootstrap.Modal.getInstance(document.getElementById('deleteAccountModal')).hide();
+
+      document.getElementById('loginForm').reset();
+      document.getElementById('signupForm').reset();
+      showAuthForm('signup');
       showAuthScreen();
     }
 
@@ -3813,26 +4271,90 @@
         }
       });
 
+      /* ============================================================
+         MOBILE SIDEBAR: open/close + real back-button support.
+         Opening pushes a history entry so the phone's back button (or
+         gesture) closes the menu instead of leaving/closing the whole
+         site. Closing via the toggle/backdrop instead pops that entry
+         itself, so back-button history never fills up with dead states.
+         ============================================================ */
+      let mobileSidebarHistoryPushed = false;
+
+      function openMobileSidebar() {
+        document.getElementById('sidebar').classList.add('show');
+        document.body.classList.add('sidebar-open');
+        const icon = document.getElementById('mobileMenuBtnIcon');
+        if (icon) icon.className = 'fa-solid fa-xmark fs-5';
+        if (!mobileSidebarHistoryPushed) {
+          history.pushState({ mobileMenuOpen: true }, '');
+          mobileSidebarHistoryPushed = true;
+        }
+      }
+
+      function closeMobileSidebar(viaBackButton) {
+        document.getElementById('sidebar').classList.remove('show');
+        document.body.classList.remove('sidebar-open');
+        const icon = document.getElementById('mobileMenuBtnIcon');
+        if (icon) icon.className = 'fa-solid fa-bars fs-5';
+        if (mobileSidebarHistoryPushed) {
+          mobileSidebarHistoryPushed = false;
+          if (!viaBackButton) history.back();
+        }
+      }
+
+      window.addEventListener('popstate', () => {
+        if (document.getElementById('sidebar').classList.contains('show')) {
+          closeMobileSidebar(true);
+        }
+      });
+
       document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-        document.getElementById('sidebar').classList.toggle('show');
+        if (document.getElementById('sidebar').classList.contains('show')) {
+          closeMobileSidebar(false);
+        } else {
+          openMobileSidebar();
+        }
+      });
+
+      document.getElementById('sidebarBackdrop').addEventListener('click', () => {
+        closeMobileSidebar(false);
       });
 
       /* FIX: sticky header — add a compact floating background once the
-         page is actually scrolled, remove it again at the top. */
+         page is actually scrolled, remove it again at the top. On mobile,
+         it also slides fully out of the way while scrolling down (so it
+         never sits over the content) and slides back in the moment you
+         scroll back up — standard "auto-hide" header behavior. It never
+         hides while the slide-out menu itself is open. */
       const topHeader = document.getElementById('topHeader');
+      let lastScrollY = window.scrollY;
       window.addEventListener('scroll', () => {
-        topHeader.classList.toggle('header-scrolled', window.scrollY > 10);
-      });
+        const y = window.scrollY;
+        topHeader.classList.toggle('header-scrolled', y > 10);
 
+        if (window.innerWidth <= 767 && !document.body.classList.contains('sidebar-open')) {
+          const scrollingDown = y > lastScrollY;
+          if (scrollingDown && y > 80) {
+            topHeader.classList.add('header-hidden');
+          } else {
+            topHeader.classList.remove('header-hidden');
+          }
+        } else {
+          topHeader.classList.remove('header-hidden');
+        }
+        lastScrollY = y;
+      });
 
       const themeBtn = document.getElementById('themeToggleBtn');
       const authThemeBtn = document.getElementById('authThemeToggleBtn');
+      const settingsThemeSwitch = document.getElementById('settingsThemeSwitch');
       let darkTheme = true;
 
       function applyThemeToggleUI() {
         const icon = darkTheme ? '<i class="fa-regular fa-moon"></i>' : '<i class="fa-regular fa-sun text-warning"></i>';
         themeBtn.innerHTML = icon;
         authThemeBtn.innerHTML = icon;
+        if (settingsThemeSwitch) settingsThemeSwitch.checked = darkTheme;
       }
 
       function toggleTheme() {
@@ -3843,6 +4365,7 @@
 
       themeBtn.addEventListener('click', toggleTheme);
       authThemeBtn.addEventListener('click', toggleTheme);
+      if (settingsThemeSwitch) settingsThemeSwitch.addEventListener('change', toggleTheme);
 
     });
 
@@ -3933,6 +4456,7 @@
 
       const data = classDatasets[currentSelectedClass];
       if (data.testsAttempted < data.testsTotal) data.testsAttempted++;
+      recordTestScore(currentSelectedClass, score, mcqs.length);
 
       /* The only place chaptersDone (and therefore all real progress %)
          moves — tied to the subject this test title belongs to, capped
