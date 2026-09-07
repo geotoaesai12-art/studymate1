@@ -1,0 +1,3962 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyMate - Student Dashboard</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Cropper.js for real profile photo cropping -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0b021a 0%, #170d38 35%, #0d1238 70%, #1b0a2a 100%);
+      --sidebar-bg: rgba(16, 12, 42, 0.65);
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(168, 85, 247, 0.25);
+      --primary-purple: #7c3aed;
+      --accent-pink: #ec4899;
+      --gradient-btn: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      --gradient-active: linear-gradient(90deg, rgba(124, 58, 237, 0.9) 0%, rgba(168, 85, 247, 0.6) 100%);
+      --text-muted: #94a3b8;
+      /* Page-level colors: these are the ONLY things the light/dark theme toggle
+         changes. All cards/panels/sidebar keep their own fixed dark surface below,
+         so text inside them never depends on the page theme and stays readable. */
+      --page-bg: var(--bg-gradient);
+      --page-text: #ffffff;
+      --page-muted: #94a3b8;
+      /* FIX: the "hole" in the middle of the percentage donut charts was hardcoded
+         dark, while the % text inside it inherits the theme text color. In light
+         theme that meant dark text on a dark circle = invisible. This variable
+         keeps the hole in sync with the theme. */
+      --circle-inner-bg: #130d33;
+    }
+
+    body {
+      background: var(--page-bg);
+      background-attachment: fixed;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--page-text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    /* ============ FIX: Bootstrap gives every heading (h1–h6) its own color
+       tied to its internal dark-theme variable, which never changes because
+       <html data-bs-theme="dark"> is fixed and doesn't follow our light/dark
+       toggle. A rule that directly targets an element (even a plain h1..h6
+       selector) always wins over an inherited color from a parent card, so
+       every heading without an explicit .text-white/.text-muted class (e.g.
+       "Progress Overview", "Achievements", "Continue Where You Left Off",
+       "72%") stayed whitish and invisible on light cards. This makes plain
+       headings follow the same page/card text color as everything else.
+       Anything that should stay a fixed color (banner titles with
+       .text-white, the gradient greeting text, etc.) still wins because a
+       class selector is more specific than this plain element selector. ============ */
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--page-text);
+    }
+
+    /* ============ AUTH SCREEN (Signup / Login) ============ */
+    #authScreen {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    #authScreen .auth-card {
+      width: 100%;
+      max-width: 440px;
+    }
+    body.light-theme #authScreen .text-muted { color: #64748b !important; }
+
+    .glass-panel {
+      background: rgba(23, 19, 58, 0.45);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+    }
+
+    .glass-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(168, 85, 247, 0.5);
+      box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.3);
+    }
+
+    /* ============ FIX: text inside every dark glass surface stays white
+       BY DEFAULT (dark theme). In light theme, all of this is overridden
+       further down so the surfaces themselves turn light and this text
+       turns dark. ============ */
+    .glass-panel, .glass-card, .sidebar, .welcome-card, .upgrade-box,
+    .modal-content, .profile-photo-upload-container, .pdf-frame-wrapper,
+    .search-bar, .quick-icon-btn {
+      color: #ffffff;
+    }
+
+    /* ============ FIX: missing color utility classes (used across the page
+       but not part of Bootstrap by default — previously rendered with no
+       color at all, which is why some text/badges/icons were invisible) ============ */
+    .text-purple  { color: #c084fc !important; }
+    .bg-purple    { background-color: rgba(168, 85, 247, 0.18) !important; }
+    .border-purple{ border-color: rgba(168, 85, 247, 0.4) !important; }
+    .text-indigo  { color: #818cf8 !important; }
+    .text-emerald { color: #34d399 !important; }
+    .text-amber   { color: #fbbf24 !important; }
+
+    /* ============ FIX: keep Bootstrap's text-muted reliably legible ============ */
+    .text-muted { color: var(--text-muted) !important; }
+
+    /* ============ FIX: .text-white / .text-white-50 used on the dark chapter-
+       banner cards ("Continue Where You Left Off") were relying entirely on
+       Bootstrap's CDN utility classes. If that stylesheet is ever slow/blocked,
+       these had no color of their own and silently inherited the page's theme
+       text color instead — dark navy text on a dark banner in light theme,
+       i.e. invisible. Defining them ourselves guarantees they always render
+       white on those banners, in both themes, regardless of Bootstrap. ============ */
+    .text-white { color: #ffffff !important; }
+    .text-white-50 { color: rgba(255, 255, 255, 0.5) !important; }
+
+    /* ============ FIX: header action buttons (theme toggle, bell) ============ */
+    .action-btn {
+      background: rgba(15, 10, 36, 0.55);
+      border: 1px solid var(--card-border);
+      color: #ffffff;
+    }
+
+    /* ============ FIX: in dark theme, Logout should not stand out in red —
+       it now matches the same muted color used by the other sidebar links
+       (Settings, Profile, Chapters, etc). The !important is needed to beat
+       Bootstrap's .text-danger utility, which is itself !important. ============ */
+    #logoutNavLink {
+      color: var(--text-muted) !important;
+    }
+
+    /* ============ FIX: username in header sits loose on the page backdrop —
+       make it follow the page theme instead of staying hardcoded ============ */
+    #topHeaderUserName { color: var(--page-text); }
+    #topUserClass { color: var(--page-muted) !important; }
+
+    /* ============ FIX: wave emoji must NOT sit inside the gradient
+       text-clip effect, or it renders transparent/invisible ============ */
+    .welcome-card h3 .gradient-text {
+      background: linear-gradient(135deg, #ffffff 0%, #e9d5ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+    .welcome-card h3 .wave-emoji {
+      -webkit-text-fill-color: initial;
+      display: inline-block;
+    }
+
+    /* ================================================================
+       REAL LIGHT THEME — every dark surface turns light, every white
+       piece of text/icon turns dark. Colorful accent badges (subject
+       icons, gradient chapter thumbnails, status pills) keep their own
+       saturated colors since those already read fine on a light page.
+       ================================================================ */
+    body.light-theme {
+      --page-bg: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 35%, #eef6ff 70%, #fdf4ff 100%);
+      --page-text: #1e1b3a;
+      --page-muted: #475569;
+      /* FIX: flip the donut-chart hole to a light color so the (now dark) %
+         text inside it stays readable instead of sitting dark-on-dark. */
+      --circle-inner-bg: #ffffff;
+    }
+
+    body.light-theme .text-muted { color: #64748b !important; }
+
+    /* Sidebar */
+    body.light-theme .sidebar {
+      background: rgba(255, 255, 255, 0.85);
+      border-right-color: rgba(124, 58, 237, 0.15);
+      color: #1e1b3a;
+    }
+    body.light-theme .sidebar .text-white { color: #1e1b3a !important; }
+    body.light-theme .nav-item-link { color: #57506e; }
+    body.light-theme .nav-item-link:hover, body.light-theme .nav-item-link.active { color: #fff; }
+    body.light-theme .submenu-item { color: #6b7280; }
+    body.light-theme .submenu-item:hover, body.light-theme .submenu-item.active-class { color: #7c3aed; }
+    body.light-theme .upgrade-box {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.10) 0%, rgba(236, 72, 153, 0.08) 100%);
+      border-color: rgba(168, 85, 247, 0.3);
+      color: #1e1b3a;
+    }
+    body.light-theme .upgrade-box .text-white { color: #1e1b3a !important; }
+
+    /* Header search + action buttons */
+    body.light-theme .search-bar {
+      background: rgba(255, 255, 255, 0.9);
+      border-color: rgba(124, 58, 237, 0.2);
+    }
+    body.light-theme .search-bar input { color: #1e1b3a; }
+    body.light-theme .search-bar input::placeholder { color: #7c7a99; }
+    body.light-theme .shortcut-badge {
+      color: #7c3aed !important;
+      background: rgba(124, 58, 237, 0.08);
+      border-color: rgba(124, 58, 237, 0.3);
+    }
+    body.light-theme .action-btn {
+      background: rgba(124, 58, 237, 0.08);
+      border-color: rgba(124, 58, 237, 0.2);
+      color: #4c1d95;
+    }
+    body.light-theme .action-btn:hover {
+      background: rgba(124, 58, 237, 0.18);
+      color: #7c3aed;
+    }
+
+    /* ============ FIX: the "back" buttons (Bootstrap's .btn-outline-light —
+       white border/white text) were unreadable in light theme since they sat
+       on a light card with white-on-white styling. Now in light theme they
+       use dark text/border like the rest of the page, and on hover they pick
+       up the exact same gradient treatment as the theme-toggle icon so the
+       hover state feels consistent across the whole header. ============ */
+    body.light-theme .btn-outline-light {
+      color: #1e1b3a !important;
+      border-color: rgba(30, 27, 58, 0.35) !important;
+      background: transparent;
+    }
+    body.light-theme .btn-outline-light:hover {
+      background: var(--gradient-btn) !important;
+      border-color: transparent !important;
+      color: #ffffff !important;
+    }
+    body.light-theme .btn-outline-light:hover i {
+      color: #ffffff !important;
+    }
+
+    /* ============ FIX: in light theme, Logout's color and the notification
+       bell icon now use the exact same gradient as the "Go Premium" button
+       background, clipped to the text/icon glyph itself. color: transparent
+       is the fallback for browsers without background-clip:text support
+       (same trick already used by .gradient-text above). The !important on
+       Logout is needed to beat Bootstrap's .text-danger utility. ============ */
+    body.light-theme #logoutNavLink {
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent !important;
+    }
+    body.light-theme #notifBellIcon {
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    /* ============ FIX: in light theme, the theme-toggle icon (moon/sun)
+       now uses the exact same gradient treatment as the notification bell
+       icon above, instead of the sun's amber Bootstrap color. Targets the
+       icon by its parent button id since the icon element itself is
+       swapped between moon/sun in JS. !important beats .text-warning. ============ */
+    body.light-theme #themeToggleBtn i {
+      background: var(--gradient-btn);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent !important;
+    }
+
+    /* Welcome card keeps its own dark gradient look on purpose, but flips
+       to a light gradient in light theme so it matches the rest of the UI */
+    body.light-theme .welcome-card {
+      background: linear-gradient(135deg, #ffffff 0%, #f3e8ff 55%, #eff6ff 100%);
+    }
+    body.light-theme .welcome-card h3 .gradient-text {
+      background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    body.light-theme .welcome-card p { color: #4338ca !important; }
+
+    /* ============ FIX: "Continue Where You Left Off" chapter banners were
+       hardcoded to a fixed dark gradient in BOTH themes, with their titles
+       forced white — so making the text dark (as requested) would have put
+       dark text on a still-dark banner and made it invisible again. Instead,
+       in light theme the banners themselves switch to a lighter pastel
+       version of their own color, and only then does the text switch to
+       dark — so it stays readable and still matches the light theme. ============ */
+    body.light-theme .banner-math    { background: linear-gradient(135deg, #ede9fe, #ddd6fe) !important; }
+    body.light-theme .banner-physics { background: linear-gradient(135deg, #cffafe, #a5f3fc) !important; }
+    body.light-theme .banner-chem    { background: linear-gradient(135deg, #ffedd5, #fed7aa) !important; }
+    body.light-theme .banner-english { background: linear-gradient(135deg, #fce7f3, #fbcfe8) !important; }
+
+    body.light-theme .chapter-banner .text-white {
+      color: #1e1b3a !important;
+    }
+    body.light-theme .chapter-banner .text-white-50 {
+      color: rgba(30, 27, 58, 0.65) !important;
+    }
+
+    /* ============ FIX: "Excellent! Keep it up!" text, the fire streak icon,
+       and the "7 Days" pill are purple in both themes now (previously
+       yellow, then only switched to purple in light theme — now purple
+       everywhere). ============ */
+    .study-streak-card .text-warning {
+      background: none !important;
+      -webkit-text-fill-color: #ffffff !important;
+      color: #ffffff !important;
+    }
+    .study-streak-card .bg-warning.bg-opacity-20 {
+      background-color: rgba(124, 58, 237, 0.15) !important;
+    }
+    /* Light theme keeps the purple/gradient look on the streak text & icons */
+    body.light-theme .study-streak-card .text-warning {
+      background: var(--gradient-btn) !important;
+      -webkit-background-clip: text !important;
+      background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      color: transparent !important;
+    }
+
+    /* Generic glass surfaces (stat boxes, panels, quick-access, achievements) */
+    body.light-theme .glass-panel,
+    body.light-theme .glass-card,
+    body.light-theme .quick-icon-btn {
+      background: rgba(255, 255, 255, 0.75);
+      border-color: rgba(124, 58, 237, 0.15);
+      color: #1e1b3a;
+      box-shadow: 0 4px 20px rgba(100, 100, 150, 0.08);
+    }
+    body.light-theme .glass-card:hover { border-color: rgba(124, 58, 237, 0.35); }
+    body.light-theme .glass-panel .text-white,
+    body.light-theme .quick-icon-btn .text-white {
+      color: #1e1b3a !important;
+    }
+    /* "Read PDF" style ghost badges (bg-white bg-opacity-10 + text-white) */
+    body.light-theme .badge.bg-white.bg-opacity-10 {
+      background-color: rgba(124, 58, 237, 0.08) !important;
+      color: #4c1d95 !important;
+      border-color: rgba(124, 58, 237, 0.2) !important;
+    }
+    /* Faint white dividers/borders used throughout become soft purple */
+    body.light-theme .border-white { border-color: rgba(124, 58, 237, 0.15) !important; }
+    /* Chapter / list items rendered on a transparent background */
+    body.light-theme .list-group-item.bg-transparent { color: #1e1b3a; }
+    body.light-theme .list-group-item.bg-transparent.text-white,
+    body.light-theme .list-group-item.bg-transparent .text-white {
+      color: #1e1b3a !important;
+    }
+
+    /* Profile section: photo upload box, inputs, academic summary rows */
+    body.light-theme .profile-photo-upload-container {
+      background: rgba(124, 58, 237, 0.05);
+      border-color: rgba(124, 58, 237, 0.35);
+    }
+    body.light-theme .profile-photo-upload-container .text-white {
+      color: #1e1b3a !important;
+    }
+    body.light-theme .upload-icon-circle {
+      background: rgba(124, 58, 237, 0.12);
+      border-color: rgba(124, 58, 237, 0.3);
+      color: #7c3aed;
+    }
+    body.light-theme .profile-input {
+      background: rgba(255, 255, 255, 0.9) !important;
+      border-color: rgba(124, 58, 237, 0.25) !important;
+      color: #1e1b3a !important;
+    }
+    body.light-theme .profile-input::placeholder { color: rgba(71, 65, 95, 0.55) !important; }
+    body.light-theme .profile-input:focus {
+      background: #ffffff !important;
+    }
+    body.light-theme .academic-stat-row { background: rgba(124, 58, 237, 0.05); }
+    body.light-theme .profile-page-header-bar {
+      background: linear-gradient(90deg, rgba(124, 58, 237, 0.10) 0%, rgba(236, 72, 153, 0.06) 60%, transparent 100%);
+      border-color: rgba(124, 58, 237, 0.2);
+    }
+    body.light-theme .profile-section-title-bar {
+      background: rgba(124, 58, 237, 0.04);
+      border-color: rgba(124, 58, 237, 0.1);
+    }
+
+    /* Modals (crop tool, photo preview, update success, test start) */
+    body.light-theme .modal-content.glass-panel {
+      background: rgba(255, 255, 255, 0.97) !important;
+      color: #1e1b3a !important;
+      border-color: rgba(124, 58, 237, 0.2) !important;
+    }
+    body.light-theme .modal-content .text-white {
+      color: #1e1b3a !important;
+    }
+    body.light-theme .cropper-modal-image-wrapper { background: #ede9fe; }
+
+    /* PDF book reader frame */
+    body.light-theme .pdf-frame-wrapper { background: #f1f5f9; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--sidebar-bg);
+      backdrop-filter: blur(25px);
+      border-right: 1px solid var(--card-border);
+      min-height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1050;
+      transition: all 0.3s ease;
+    }
+
+    .sidebar-brand-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #8b5cf6, #ec4899);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    }
+
+    .nav-item-link {
+      color: var(--text-muted);
+      padding: 10px 16px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.92rem;
+      transition: all 0.2s ease;
+      margin-bottom: 2px;
+      cursor: pointer;
+    }
+
+    .nav-item-link:hover, .nav-item-link.active {
+      color: #fff;
+      background: var(--gradient-active);
+      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+    }
+
+    /* ============ FIX: simple 1px border on hover/active/focus — no rotating
+       animation, matches what the sidebar needs (search-box-style glow removed
+       per feedback). ============ */
+    .nav-item-link {
+      border: 1px solid transparent;
+    }
+
+    .nav-item-link:hover,
+    .nav-item-link.active,
+    .nav-item-link:focus-visible {
+      border: 1px solid rgba(168, 85, 247, 0.5);
+    }
+
+    .nav-item-link i {
+      width: 22px;
+    }
+
+    .submenu-item {
+      padding: 8px 16px 8px 45px;
+      color: var(--text-muted);
+      display: block;
+      text-decoration: none;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .submenu-item:hover, .submenu-item.active-class {
+      color: #a855f7;
+      background: rgba(168, 85, 247, 0.15);
+      font-weight: 600;
+    }
+
+    .upgrade-box {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.25) 0%, rgba(236, 72, 153, 0.15) 100%);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      border-radius: 18px;
+    }
+
+    .main-wrapper {
+      margin-left: 260px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    /* Search Box */
+    .search-box-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      border-radius: 30px;
+      padding: 2px;
+      background: rgba(255, 255, 255, 0.15);
+      transition: all 0.4s ease;
+      overflow: hidden;
+    }
+
+    .search-box-wrapper::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: conic-gradient(transparent, transparent, #a855f7, #3b82f6, #ec4899);
+      animation: rotateBorder 3s linear infinite;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    @keyframes rotateBorder {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .search-box-wrapper:focus-within::before {
+      opacity: 1;
+    }
+
+    .search-bar {
+      position: relative;
+      z-index: 2;
+      background: rgba(15, 10, 36, 0.95);
+      border: 1.5px solid rgba(255, 255, 255, 0.18);
+      border-radius: 28px;
+      padding: 8px 18px;
+      width: 100%;
+      transition: border-color 0.3s ease;
+    }
+
+    .search-box-wrapper:focus-within .search-bar {
+      border-color: transparent;
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+    }
+
+    .search-bar input {
+      background: transparent;
+      border: none;
+      color: white;
+      outline: none;
+      width: 100%;
+      caret-color: #a855f7;
+      font-weight: 500;
+    }
+
+    .search-bar input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .shortcut-badge {
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #c084fc !important;
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.2);
+    }
+
+    .action-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #a855f7;
+    }
+
+    .welcome-card-wrapper {
+      position: relative;
+      border-radius: 26px;
+      padding: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+
+    .welcome-card-wrapper::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: conic-gradient(transparent, #8b5cf6, #ec4899, #3b82f6, transparent);
+      animation: rotateBorder 6s linear infinite;
+    }
+
+    .welcome-card {
+      position: relative;
+      z-index: 2;
+      background: var(--bg-gradient);
+      border-radius: 24px;
+      padding: 28px 32px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    }
+
+    .welcome-card h3 {
+      font-weight: 800;
+    }
+
+    .welcome-card p {
+      color: #38bdf8 !important;
+      font-weight: 500;
+    }
+
+    .circle-chart {
+      width: 65px;
+      height: 65px;
+      border-radius: 50%;
+      background: conic-gradient(#8b5cf6 0% 72%, rgba(255,255,255,0.1) 72% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .circle-chart::after {
+      content: '';
+      width: 51px;
+      height: 51px;
+      border-radius: 50%;
+      background: var(--circle-inner-bg);
+      position: absolute;
+    }
+
+    .circle-chart span {
+      position: relative;
+      z-index: 2;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .big-circle-chart {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: conic-gradient(#6366f1 0% 72%, rgba(255, 255, 255, 0.08) 72% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .big-circle-chart::after {
+      content: '';
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--circle-inner-bg);
+      position: absolute;
+    }
+
+    .big-circle-chart div {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+    }
+
+    .streak-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* Dark theme (default): filled streak days are a white circle with a
+       black tick inside, and the Sun/Mon/Tue... day labels are white. */
+    .streak-active {
+      background: #ffffff;
+      color: #000000;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+    }
+    .study-streak-card #streakDotsRow small {
+      color: #ffffff !important;
+    }
+
+    /* Light theme: filled streak days use the theme's own purple accent
+       color (matching the rest of the light-theme text/icon color), with
+       a white tick in the center. */
+    body.light-theme .streak-active {
+      background: #7c3aed !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 10px rgba(124, 58, 237, 0.35);
+    }
+    body.light-theme .study-streak-card #streakDotsRow small {
+      color: #7c3aed !important;
+    }
+
+    /* ============ NOTIFICATIONS: unique "Upcoming" pill + detail box ============ */
+    .notif-upcoming-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #7dd3fc;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(99, 102, 241, 0.18) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+    .notif-pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
+      animation: notifPulse 1.6s infinite;
+    }
+    @keyframes notifPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
+      70%  { box-shadow: 0 0 0 7px rgba(56, 189, 248, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+    }
+    body.light-theme .notif-upcoming-pill {
+      color: #0369a1;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+
+    .notif-detail-box {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 0.82rem;
+    }
+    .notif-detail-box p { color: var(--page-text); }
+    body.light-theme .notif-detail-box {
+      background: rgba(124, 58, 237, 0.06);
+    }
+
+    .btn-gradient-sm {
+      background: var(--gradient-btn);
+      border: none;
+      color: white;
+      border-radius: 10px;
+      padding: 6px 16px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .btn-gradient-sm:hover {
+      opacity: 0.9;
+      transform: scale(1.02);
+      color: white;
+    }
+
+    .quick-icon-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quick-icon-btn:hover {
+      background: rgba(124, 58, 237, 0.2);
+      border-color: rgba(168, 85, 247, 0.5);
+    }
+
+    .pdf-frame-wrapper {
+      width: 100%;
+      height: 650px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #1e1b4b;
+    }
+
+    /* REDESIGNED UNIQUE PROFESSIONAL PROFILE STYLES */
+    .profile-photo-upload-container {
+      position: relative;
+      width: 100%;
+      max-width: 260px;
+      height: 260px;
+      margin: 0 auto;
+      border: 2px dashed rgba(168, 85, 247, 0.5);
+      border-radius: 24px;
+      background: rgba(15, 10, 36, 0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .profile-photo-upload-container:hover {
+      border-color: #ec4899;
+      background: rgba(23, 19, 58, 0.7);
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);
+    }
+
+    .profile-img-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .upload-placeholder-content {
+      text-align: center;
+      padding: 20px;
+      cursor: pointer;
+    }
+
+    .upload-icon-circle {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px auto;
+      font-size: 1.5rem;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    .profile-img-overlay-actions {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      background: rgba(15, 10, 36, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .profile-photo-upload-container:hover .profile-img-overlay-actions {
+      opacity: 1;
+    }
+
+    .profile-input-group {
+      position: relative;
+    }
+
+    .profile-input-group i.input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .profile-input {
+      background: rgba(15, 10, 36, 0.6) !important;
+      border: 1px solid var(--card-border) !important;
+      color: #fff !important;
+      border-radius: 12px !important;
+      padding: 10px 14px 10px 40px !important;
+      font-size: 0.9rem;
+    }
+
+    .profile-input:focus {
+      background: rgba(23, 19, 58, 0.9) !important;
+      border-color: #a855f7 !important;
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.3) !important;
+    }
+
+    .profile-input::placeholder {
+      color: rgba(148, 163, 184, 0.5) !important;
+    }
+
+    /* ============ PROFILE SECTION: COLORED HEADER CHIPS (matches dashboard look) ============ */
+    .section-icon-chip {
+      width: 46px;
+      height: 46px;
+      min-width: 46px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .chip-purple { background: rgba(168, 85, 247, 0.18); color: #c084fc; box-shadow: 0 0 14px rgba(168, 85, 247, 0.25); }
+    .chip-blue   { background: rgba(56, 189, 248, 0.18); color: #38bdf8; box-shadow: 0 0 14px rgba(56, 189, 248, 0.25); }
+    .chip-pink   { background: rgba(236, 72, 153, 0.18); color: #f472b6; box-shadow: 0 0 14px rgba(236, 72, 153, 0.25); }
+    .chip-green  { background: rgba(16, 185, 129, 0.18); color: #34d399; box-shadow: 0 0 14px rgba(16, 185, 129, 0.25); }
+    .chip-amber  { background: rgba(245, 158, 11, 0.18); color: #fbbf24; box-shadow: 0 0 14px rgba(245, 158, 11, 0.25); }
+    .chip-red    { background: rgba(239, 68, 68, 0.18); color: #f87171; box-shadow: 0 0 14px rgba(239, 68, 68, 0.25); }
+
+    .profile-page-header-bar {
+      background: linear-gradient(90deg, rgba(124, 58, 237, 0.18) 0%, rgba(236, 72, 153, 0.10) 60%, transparent 100%);
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      border-radius: 18px;
+      padding: 14px 18px;
+    }
+
+    .profile-section-title-bar {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 14px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* Give each field group a subtle unique left-accent so every box feels distinct */
+    .profile-input-group.accent-purple .profile-input:focus { border-color: #a855f7 !important; }
+    .profile-input-group.accent-blue .profile-input:focus   { border-color: #38bdf8 !important; }
+    .profile-input-group.accent-pink .profile-input:focus   { border-color: #ec4899 !important; }
+    .profile-input-group.accent-green .profile-input:focus  { border-color: #10b981 !important; }
+    .profile-input-group.accent-amber .profile-input:focus  { border-color: #f59e0b !important; }
+
+    .profile-input-group.accent-purple i.input-icon { color: #c084fc; }
+    .profile-input-group.accent-blue i.input-icon   { color: #38bdf8; }
+    .profile-input-group.accent-pink i.input-icon   { color: #f472b6; }
+    .profile-input-group.accent-green i.input-icon  { color: #34d399; }
+    .profile-input-group.accent-amber i.input-icon  { color: #fbbf24; }
+
+    .academic-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* ============ PHOTO ACTION BUTTONS: UNIQUE COLORED RINGS ============ */
+    .profile-img-overlay-actions .btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .profile-img-overlay-actions .btn:hover { transform: scale(1.15); }
+    .profile-img-overlay-actions .btn.text-white:hover  { background: #6366f1 !important; }
+    .profile-img-overlay-actions .btn.text-info:hover   { background: #0ea5e9 !important; }
+    .profile-img-overlay-actions .btn.text-warning:hover{ background: #f59e0b !important; color:#1a1030 !important; }
+    .profile-img-overlay-actions .btn.text-danger:hover { background: #ef4444 !important; color:#fff !important; }
+
+    /* ============ CROPPER MODAL ============ */
+    .cropper-modal-image-wrapper {
+      width: 100%;
+      max-height: 420px;
+      background: #0b021a;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .cropper-modal-image-wrapper img { display: block; max-width: 100%; }
+
+    /* ============ SUCCESS POPUP ANIMATION ============ */
+    .success-check-circle {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 2px solid #10b981;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px auto;
+      font-size: 2.4rem;
+      color: #10b981;
+      animation: successPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
+    }
+
+    @keyframes successPop {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+
+    /* ============ UNIVERSAL "PRESSED" BACKGROUND FEEDBACK FOR EVERY BUTTON ============ */
+    .btn, .action-btn, .nav-item-link, .submenu-item, .quick-icon-btn, .glass-card, button {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:active, button.btn-close:active {
+      transform: scale(0.96);
+    }
+
+    .btn-gradient-sm:active {
+      background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%) !important;
+      box-shadow: 0 0 16px rgba(124, 58, 237, 0.6) !important;
+    }
+
+    .btn-outline-light:active {
+      background: rgba(168, 85, 247, 0.25) !important;
+      border-color: #a855f7 !important;
+      color: #fff !important;
+    }
+
+    .action-btn:active {
+      background: rgba(168, 85, 247, 0.3) !important;
+      color: #fff !important;
+      transform: scale(0.92);
+    }
+
+    .quick-icon-btn:active {
+      background: rgba(124, 58, 237, 0.35) !important;
+      border-color: #a855f7 !important;
+      transform: scale(0.96);
+    }
+
+    .nav-item-link:active {
+      background: var(--gradient-active) !important;
+      color: #fff !important;
+    }
+
+    /* ============ SEARCH BOX: LIVELIER, ALWAYS-VISIBLE SUBTLE ANIMATION ============ */
+    .search-box-wrapper {
+      animation: searchGlowPulse 4s ease-in-out infinite;
+    }
+
+    @keyframes searchGlowPulse {
+      0%, 100% { box-shadow: 0 0 0 rgba(168, 85, 247, 0); }
+      50% { box-shadow: 0 0 16px rgba(168, 85, 247, 0.35); }
+    }
+
+    .search-box-wrapper:hover::before {
+      opacity: 0.6;
+    }
+
+    @media (max-width: 991px) {
+      .sidebar { left: -270px; }
+      .sidebar.show { left: 0; }
+      .main-wrapper { margin-left: 0; }
+    }
+
+    /* ============ FIX: header (search box, notification, theme toggle,
+       profile) used to scroll away with the page. Now it sticks to the top,
+       and once you actually scroll down it gets its own small, cute floating
+       pill container (blurred glass background, rounded, soft shadow) so it
+       stands out instead of floating loose over the content. Nothing else
+       about the header changes — same icons, same layout, same order. ============ */
+    header#topHeader {
+      position: sticky;
+      top: 0;
+      z-index: 1030;
+      transition: all 0.35s ease;
+      padding: 6px 0;
+    }
+
+    header#topHeader.header-scrolled {
+      background: rgba(23, 19, 58, 0.6);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: none;
+      border-radius: 20px;
+      padding: 10px 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    body.light-theme header#topHeader.header-scrolled {
+      background: rgba(255, 255, 255, 0.8);
+      border: none;
+      box-shadow: 0 8px 24px rgba(100, 100, 150, 0.15);
+    }
+
+    header#topHeader.header-scrolled .search-box-wrapper {
+      max-width: 340px;
+    }
+
+    header#topHeader.header-scrolled .action-btn {
+      width: 34px;
+      height: 34px;
+      font-size: 0.85rem;
+    }
+
+    header#topHeader.header-scrolled #topHeaderUserAvatar {
+      width: 32px !important;
+      height: 32px !important;
+    }
+
+    header#topHeader.header-scrolled .shortcut-badge {
+      display: none;
+    }
+
+    @media (max-width: 767px) {
+      header#topHeader.header-scrolled { border-radius: 16px; padding: 8px 12px; }
+      header#topHeader.header-scrolled .search-box-wrapper { max-width: 200px; }
+    }
+
+    @media (max-width: 575px) {
+      header#topHeader.header-scrolled #topHeaderUserName,
+      header#topHeader.header-scrolled #topUserClass { display: none; }
+    }
+
+    /* ============ FIX: on mobile the search box and the icon row
+       (theme toggle, notification bell, profile) used to sit side by
+       side and fight for space, causing them to overlap/clip. Now on
+       small screens the icon row (toggle + bell + profile) always
+       renders first as its own full-width single line, and the search
+       box sits cleanly on its own full-width line right underneath —
+       nothing stacks on top of anything else. ============ */
+    @media (max-width: 575px) {
+      header#topHeader {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      header#topHeader #headerIconsRow {
+        order: -1;
+        width: 100%;
+        margin-left: 0 !important;
+        justify-content: space-between;
+      }
+      header#topHeader .search-box-wrapper {
+        width: 100%;
+        max-width: 100% !important;
+      }
+      header#topHeader .search-bar {
+        width: 100%;
+      }
+      header#topHeader #headerIconsRow .shortcut-badge {
+        display: none;
+      }
+    }
+
+    /* ============ FIX: dashboard bottom widgets (Progress Overview,
+       Achievements, Quick Access) and their action buttons now stack
+       cleanly full-width on mobile instead of squeezing into tiny
+       columns, and the Quick Access icon grid shrinks its icons/text
+       so all 8 icons stay readable instead of overflowing. ============ */
+    @media (max-width: 575px) {
+      .quick-icon-btn i {
+        font-size: 0.95rem;
+      }
+      .quick-icon-btn small {
+        font-size: 0.58rem !important;
+      }
+      .glass-card .btn,
+      .glass-panel .btn {
+        white-space: normal;
+      }
+      #dashboardAchievementsRow .glass-card,
+      #dashboardAchievementsRow .p-2 {
+        padding: 0.5rem !important;
+      }
+      .big-circle-chart {
+        width: 70px !important;
+        height: 70px !important;
+      }
+    }
+
+    /* ================================================================
+       THEMED FORM FIELD — generic reusable input/textarea/select style
+       that (unlike a hardcoded inline color:#fff) actually follows the
+       light/dark theme, so text always stays readable in both. Used by
+       the Sticky Notes composer and the Test answer boxes.
+       ================================================================ */
+    .themed-field {
+      background: rgba(15, 10, 36, 0.6) !important;
+      border: 1px solid var(--card-border) !important;
+      color: #fff !important;
+      border-radius: 12px !important;
+      padding: 10px 14px !important;
+      font-size: 0.9rem;
+    }
+    .themed-field:focus {
+      background: rgba(23, 19, 58, 0.9) !important;
+      border-color: #a855f7 !important;
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.3) !important;
+      color: #fff !important;
+    }
+    .themed-field::placeholder { color: rgba(148, 163, 184, 0.6) !important; }
+    body.light-theme .themed-field {
+      background: rgba(255, 255, 255, 0.9) !important;
+      border-color: rgba(124, 58, 237, 0.25) !important;
+      color: #1e1b3a !important;
+    }
+    body.light-theme .themed-field:focus {
+      background: #ffffff !important;
+      color: #1e1b3a !important;
+    }
+    body.light-theme .themed-field::placeholder { color: rgba(71, 65, 95, 0.55) !important; }
+    /* Select options render with the OS/browser's own popup, but keep the
+       closed control itself legible on both themes */
+    select.themed-field option { color: #1e1b3a; background: #fff; }
+
+    /* ================================================================
+       STICKY NOTES — real, pinned-note style cards with a user-chosen
+       color, text color, font size, optional heading and optional
+       diagram/image. Nothing here is a fixed/fake preview — every note
+       is built from what the student actually entered in the composer.
+       ================================================================ */
+    .sticky-note-card {
+      position: relative;
+      border-radius: 16px;
+      padding: 18px 16px 14px 16px;
+      min-height: 170px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .sticky-note-card:hover {
+      transform: translateY(-5px) rotate(0deg) !important;
+      box-shadow: 0 16px 30px rgba(0, 0, 0, 0.3);
+      z-index: 2;
+    }
+    #stickyNotesList > div:nth-child(4n+1) .sticky-note-card { transform: rotate(-1.4deg); }
+    #stickyNotesList > div:nth-child(4n+2) .sticky-note-card { transform: rotate(1deg); }
+    #stickyNotesList > div:nth-child(4n+3) .sticky-note-card { transform: rotate(-0.5deg); }
+    #stickyNotesList > div:nth-child(4n) .sticky-note-card { transform: rotate(1.6deg); }
+    .sticky-note-pin {
+      position: absolute;
+      top: -9px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #ffffff, #cbd5e1 55%, #64748b 100%);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+    }
+    .sticky-note-heading {
+      font-weight: 800;
+      line-height: 1.3;
+      margin-bottom: 6px;
+      word-break: break-word;
+    }
+    .sticky-note-text {
+      word-break: break-word;
+      white-space: pre-wrap;
+      flex-grow: 1;
+      line-height: 1.45;
+    }
+    .sticky-note-image {
+      width: 100%;
+      max-height: 130px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin: 6px 0 10px 0;
+      display: block;
+    }
+    .sticky-note-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(0, 0, 0, 0.14);
+    }
+    .sticky-note-footer .btn {
+      padding: 2px 8px;
+      line-height: 1;
+    }
+    .sticky-color-swatch {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      padding: 0;
+    }
+    .sticky-color-swatch:hover { transform: scale(1.12); }
+    .sticky-color-swatch.active-swatch {
+      border-color: #fff;
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.55);
+    }
+    body.light-theme .sticky-color-swatch.active-swatch {
+      border-color: #1e1b3a;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.35);
+    }
+    #stickyNoteLivePreview .sticky-note-card { min-height: 120px; }
+
+    /* ================================================================
+       BOOKMARKS — real per-page bookmark toggle on the book reader,
+       and the saved-bookmark cards in the Bookmarks section.
+       ================================================================ */
+    #bookmarkPageBtn.is-bookmarked {
+      background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%) !important;
+      border-color: transparent !important;
+      color: #fff !important;
+    }
+    .bookmark-card-subject-badge {
+      font-size: 0.65rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ AUTH SCREEN (Signup / Login) ============
+       Shown when nobody is logged in yet. Handles real student signup
+       (name, email, password, class) and login, both persisted in
+       localStorage ('studymate_users_v1' for accounts, 'studymate_session_v1'
+       for who is currently logged in) so returning with the same email +
+       password logs back in, and logging out sends you back here. ============ -->
+  <div id="authScreen">
+    <div class="auth-card glass-panel p-4 p-md-5">
+      <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+          <div class="sidebar-brand-icon">
+            <i class="fa-solid fa-graduation-cap text-white fs-5"></i>
+          </div>
+          <div>
+            <h5 class="fw-bold mb-0 text-white">StudyMate</h5>
+            <small class="text-muted" style="font-size: 0.72rem;">Learn Better, Score Higher</small>
+          </div>
+        </div>
+        <button class="action-btn" id="authThemeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="loginFormWrap">
+        <h4 class="fw-bold mb-1">Welcome back</h4>
+        <p class="text-muted small mb-4">Log in with your student account to continue.</p>
+
+        <div id="loginErrorBox" class="alert alert-danger py-2 small" style="display:none;"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Email</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-envelope input-icon"></i>
+              <input type="email" id="loginEmail" class="form-control profile-input" placeholder="you@example.com" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Password</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="loginPassword" class="form-control profile-input" placeholder="Your password" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-gradient-sm w-100 py-2 mt-2">Log In <i class="fa-solid fa-arrow-right ms-1"></i></button>
+        </form>
+
+        <p class="text-muted small text-center mt-4 mb-0">
+          Don't have an account? <a href="#" onclick="showAuthForm('signup'); return false;" class="fw-bold" style="color:#a855f7;">Sign up</a>
+        </p>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="signupFormWrap" style="display:none;">
+        <h4 class="fw-bold mb-1">Create your account</h4>
+        <p class="text-muted small mb-4">Sign up as a student to start tracking your progress.</p>
+
+        <div id="signupErrorBox" class="alert alert-danger py-2 small" style="display:none;"></div>
+
+        <form id="signupForm" onsubmit="handleSignup(event)">
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Full Name</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-user input-icon"></i>
+              <input type="text" id="signupName" class="form-control profile-input" placeholder="e.g. Ahmed Khan" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Class</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-layer-group input-icon"></i>
+              <select id="signupClass" class="form-select profile-input" required>
+                <option value="Class 9">Class 9</option>
+                <option value="Class 10" selected>Class 10</option>
+                <option value="Class 11">Class 11</option>
+                <option value="Class 12">Class 12</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Email</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-envelope input-icon"></i>
+              <input type="email" id="signupEmail" class="form-control profile-input" placeholder="you@example.com" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Password</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="signupPassword" class="form-control profile-input" placeholder="Create a password" minlength="4" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Confirm Password</label>
+            <div class="profile-input-group accent-purple">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="signupConfirmPassword" class="form-control profile-input" placeholder="Re-enter your password" minlength="4" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-gradient-sm w-100 py-2 mt-2">Sign Up <i class="fa-solid fa-arrow-right ms-1"></i></button>
+        </form>
+
+        <p class="text-muted small text-center mt-4 mb-0">
+          Already have an account? <a href="#" onclick="showAuthForm('login'); return false;" class="fw-bold" style="color:#a855f7;">Log in</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logout Confirmation Modal (centered, replaces the plain browser popup) -->
+  <div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white" style="background: #171038;">
+        <div class="modal-body text-center py-4">
+          <div class="mx-auto mb-3 d-flex align-items-center justify-content-center" style="width:56px; height:56px; border-radius:50%; background: rgba(239, 68, 68, 0.15);">
+            <i class="fa-solid fa-right-from-bracket text-danger fs-4"></i>
+          </div>
+          <h5 class="fw-bold mb-1">Log out?</h5>
+          <p class="text-muted small mb-0">Are you sure you want to logout?</p>
+        </div>
+        <div class="modal-footer border-0 justify-content-center pb-4">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger rounded-pill px-4" onclick="handleLogout()" data-bs-dismiss="modal">Yes, Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="appShell" style="display:none;">
+
+  <!-- Mobile Toggle -->
+  <div class="position-fixed bottom-0 end-0 m-3 d-lg-none" style="z-index: 1090;">
+    <button class="btn btn-primary rounded-circle p-3 shadow-lg" id="mobileMenuBtn">
+      <i class="fa-solid fa-bars fs-5"></i>
+    </button>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar p-3 d-flex flex-column" id="sidebar">
+    <div class="d-flex align-items-center gap-3 px-2 mb-4">
+      <div class="sidebar-brand-icon">
+        <i class="fa-solid fa-graduation-cap text-white fs-5"></i>
+      </div>
+      <div>
+        <h5 class="fw-bold mb-0 text-white">StudyMate</h5>
+        <small class="text-muted" style="font-size: 0.72rem;">Learn Better, Score Higher</small>
+      </div>
+    </div>
+
+    <!-- Nav List -->
+    <div class="nav flex-column gap-1 mb-auto" id="sidebarNav">
+      <a class="nav-item-link active" data-section="dashboard" onclick="showSection('dashboard')">
+        <span><i class="fa-solid fa-house me-2"></i> Dashboard</span>
+      </a>
+
+      <!-- Classes Collapsible Menu -->
+      <div>
+        <a class="nav-item-link" id="classesDropdownBtn">
+          <span><i class="fa-solid fa-layer-group me-2"></i> Classes</span>
+          <i class="fa-solid fa-chevron-down opacity-50" id="classChevron" style="font-size: 0.7rem; transition: 0.3s;"></i>
+        </a>
+        <div class="collapse show" id="classesCollapse">
+          <div class="d-flex flex-column gap-1 my-1">
+            <a class="submenu-item" onclick="switchClass('Class 9')"><i class="fa-solid fa-graduation-cap me-2"></i> Class 9</a>
+            <a class="submenu-item active-class" onclick="switchClass('Class 10')"><i class="fa-solid fa-graduation-cap me-2"></i> Class 10</a>
+            <a class="submenu-item" onclick="switchClass('Class 11')"><i class="fa-solid fa-graduation-cap me-2"></i> Class 11</a>
+            <a class="submenu-item" onclick="switchClass('Class 12')"><i class="fa-solid fa-graduation-cap me-2"></i> Class 12</a>
+          </div>
+        </div>
+      </div>
+
+      <a class="nav-item-link" data-section="subjects" onclick="showSection('subjects')">
+        <span><i class="fa-solid fa-book-open me-2"></i> Subjects</span>
+      </a>
+
+      <a class="nav-item-link" data-section="chapters" onclick="showSection('chapters')">
+        <span><i class="fa-solid fa-book me-2"></i> Chapters</span>
+      </a>
+
+      <a class="nav-item-link" data-section="tests" onclick="showSection('tests')">
+        <span><i class="fa-solid fa-clipboard-check me-2"></i> Tests</span>
+      </a>
+
+      <a class="nav-item-link" data-section="results" onclick="showSection('results')">
+        <span><i class="fa-solid fa-chart-simple me-2"></i> Results</span>
+      </a>
+
+      <a class="nav-item-link" data-section="bookmarks" onclick="showSection('bookmarks')">
+        <span><i class="fa-solid fa-bookmark me-2"></i> Bookmarks</span>
+      </a>
+
+      <a class="nav-item-link" data-section="stickynotes" onclick="showSection('stickynotes')">
+        <span><i class="fa-solid fa-note-sticky me-2"></i> Sticky Notes</span>
+      </a>
+
+      <a class="nav-item-link" data-section="progress" onclick="showSection('progress')">
+        <span><i class="fa-solid fa-chart-line me-2"></i> Progress</span>
+      </a>
+
+      <a class="nav-item-link" data-section="achievements" onclick="showSection('achievements')">
+        <span><i class="fa-solid fa-trophy me-2"></i> Achievements</span>
+      </a>
+
+      <a class="nav-item-link" data-section="profile" onclick="showSection('profile')">
+        <span><i class="fa-solid fa-user me-2"></i> Profile</span>
+      </a>
+
+      <a class="nav-item-link" data-section="settings" onclick="showSection('settings')">
+        <span><i class="fa-solid fa-gear me-2"></i> Settings</span>
+      </a>
+    </div>
+
+    <!-- Upgrade Box -->
+    <div class="upgrade-box p-3 my-3 text-center">
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+        <i class="fa-solid fa-crown text-warning"></i>
+        <span class="fw-bold fs-6">Upgrade to Premium</span>
+      </div>
+      <p class="text-muted small mb-3" style="font-size: 0.75rem;">Unlock all features and study without limits.</p>
+      <button class="btn btn-gradient-sm w-100" onclick="alert('Premium Plan Activated Successfully!')">Go Premium <i class="fa-solid fa-arrow-right ms-1"></i></button>
+    </div>
+
+    <!-- Logout -->
+    <a href="#" id="logoutNavLink" class="nav-item-link text-danger" onclick="new bootstrap.Modal(document.getElementById('logoutConfirmModal')).show(); return false;">
+      <span><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</span>
+    </a>
+  </aside>
+
+  <!-- Main Workspace -->
+  <div class="main-wrapper">
+    
+    <!-- Top Header Navigation -->
+    <header class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap" id="topHeader">
+      
+      <!-- Search Box with Animated Border Line -->
+      <div class="search-box-wrapper">
+        <div class="search-bar d-flex align-items-center gap-2">
+          <i class="fa-solid fa-magnifying-glass text-muted"></i>
+          <input type="text" id="mainSearchInput" placeholder="Search subjects, chapters, notes, tests...">
+          <span class="badge shortcut-badge px-2 py-1 rounded-2">Ctrl + K</span>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-3 ms-auto" id="headerIconsRow">
+        <button class="action-btn" id="themeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
+        <button class="action-btn position-relative" onclick="showSection('notifications')" title="Notifications">
+          <i class="fa-regular fa-bell" id="notifBellIcon"></i>
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBellBadge" style="display:none; font-size: 0.6rem; padding: 3px 5px;"></span>
+        </button>
+
+        <div class="d-flex align-items-center gap-2 ps-2 border-start border-white border-opacity-10" style="cursor: pointer;" onclick="showSection('profile')">
+          <img id="topHeaderUserAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Ahmed Khan" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+          <div>
+            <h6 class="mb-0 fw-bold fs-6" id="topHeaderUserName">Ahmed Khan</h6>
+            <small class="text-muted d-block" id="topUserClass" style="font-size: 0.72rem;">Class 10 <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.6rem;"></i></small>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION 1: DASHBOARD VIEW -->
+    <div id="dashboardSection">
+      <div class="row g-4">
+        
+        <!-- Left / Center Content -->
+        <div class="col-xl-9 col-lg-8">
+          
+          <!-- Welcome Greeting Card -->
+          <div class="welcome-card-wrapper mb-4">
+            <div class="welcome-card d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <h3 class="mb-1"><span class="gradient-text">Assalam-o-Alaikum, <span id="dashGreetingName">Ahmed</span>!</span> <span class="wave-emoji">&#128075;</span></h3>
+                <p class="mb-0">Keep learning, keep growing! ✨</p>
+              </div>
+              <span class="badge bg-purple bg-opacity-20 border border-purple border-opacity-30 text-purple px-3 py-2 rounded-pill fs-6 fw-bold" id="heroClassBadge" style="color: #c084fc; background: rgba(168, 85, 247, 0.15);">
+                <i class="fa-solid fa-graduation-cap me-1"></i> Class 10
+              </span>
+            </div>
+          </div>
+
+          <!-- Top Stats Bar -->
+          <div class="row g-3 mb-4">
+            <div class="col-xl-3 col-sm-6" onclick="showSection('progress')" style="cursor: pointer;">
+              <div class="glass-card p-3 d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="circle-chart" id="circleChartSmall">
+                    <span id="statOverall">72%</span>
+                  </div>
+                </div>
+                <div class="text-end">
+                  <small class="text-muted d-block mb-1">Overall Progress</small>
+                  <span class="text-success small fw-bold"><i class="fa-solid fa-arrow-up me-1"></i><span id="overallDelta">0%</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3 col-sm-6" onclick="showSection('chapters')" style="cursor: pointer;">
+              <div class="glass-card p-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 p-3 text-emerald" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                  <i class="fa-solid fa-book-bookmark fs-4"></i>
+                </div>
+                <div>
+                  <h4 class="fw-bold mb-0" id="statChapters">18</h4>
+                  <small class="text-muted d-block">Completed Chapters</small>
+                  <span class="text-success small fw-bold"><i class="fa-solid fa-arrow-up me-1"></i><span id="chaptersDelta">0 new</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3 col-sm-6" onclick="showSection('tests')" style="cursor: pointer;">
+              <div class="glass-card p-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 p-3 text-indigo" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">
+                  <i class="fa-solid fa-shield-halved fs-4"></i>
+                </div>
+                <div>
+                  <h4 class="fw-bold mb-0" id="statTests">12</h4>
+                  <small class="text-muted d-block">Tests Attempted</small>
+                  <span class="text-success small fw-bold"><i class="fa-solid fa-arrow-up me-1"></i><span id="testsDelta">0 more</span></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3 col-sm-6" onclick="showSection('stickynotes')" style="cursor: pointer;">
+              <div class="glass-card p-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 p-3 text-amber" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+                  <i class="fa-solid fa-note-sticky fs-4"></i>
+                </div>
+                <div>
+                  <h4 class="fw-bold mb-0" id="statNotesCount">0</h4>
+                  <small class="text-muted d-block">Sticky Notes</small>
+                  <span class="text-success small fw-bold"><i class="fa-solid fa-arrow-up me-1"></i><span id="notesDelta">0 new</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- My Subjects Grid Header -->
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0" id="subjectsHeaderTitle">My Subjects (Class 10)</h5>
+            <a onclick="showSection('subjects')" class="text-decoration-none text-primary small fw-semibold" style="cursor: pointer;">View All Subjects <i class="fa-solid fa-arrow-right ms-1"></i></a>
+          </div>
+
+          <!-- Dynamic Subjects Grid Container -->
+          <div class="row g-3 mb-4" id="subjectsGrid">
+            <!-- Dynamic Subject Cards -->
+          </div>
+
+          <!-- Continue Where You Left Off -->
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">Continue Where You Left Off</h5>
+            <a onclick="showSection('chapters')" class="text-decoration-none text-primary small fw-semibold" style="cursor: pointer;">View All <i class="fa-solid fa-arrow-right ms-1"></i></a>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6 col-xl-3" id="contCardMathematics">
+              <div class="glass-card overflow-hidden h-100 d-flex flex-column">
+                <div class="p-3 bg-gradient position-relative chapter-banner banner-math" style="background: linear-gradient(135deg, #2a1147, #4c1d95); height: 110px;">
+                  <div class="position-absolute bottom-0 start-0 m-3">
+                    <h6 class="fw-bold mb-0 text-white">Mathematics</h6>
+                    <small class="text-white-50" id="contChapterMathematics">Chapter 4: Quadratic Equations</small>
+                  </div>
+                </div>
+                <div class="p-3 mt-auto">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-muted" id="contProgMathematics">75% Completed</span>
+                    <button class="btn btn-gradient-sm py-1 px-3" onclick="openBookViewer('Mathematics')">Continue <i class="fa-solid fa-arrow-right ms-1"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3" id="contCardPhysics">
+              <div class="glass-card overflow-hidden h-100 d-flex flex-column">
+                <div class="p-3 bg-gradient position-relative chapter-banner banner-physics" style="background: linear-gradient(135deg, #0c334c, #0e7490); height: 110px;">
+                  <div class="position-absolute bottom-0 start-0 m-3">
+                    <h6 class="fw-bold mb-0 text-white">Physics</h6>
+                    <small class="text-white-50" id="contChapterPhysics">Chapter 5: Force & Motion</small>
+                  </div>
+                </div>
+                <div class="p-3 mt-auto">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-muted" id="contProgPhysics">65% Completed</span>
+                    <button class="btn btn-gradient-sm py-1 px-3" onclick="openBookViewer('Physics')">Continue <i class="fa-solid fa-arrow-right ms-1"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3" id="contCardChemistry">
+              <div class="glass-card overflow-hidden h-100 d-flex flex-column">
+                <div class="p-3 bg-gradient position-relative chapter-banner banner-chem" style="background: linear-gradient(135deg, #451a03, #c2410c); height: 110px;">
+                  <div class="position-absolute bottom-0 start-0 m-3">
+                    <h6 class="fw-bold mb-0 text-white">Chemistry</h6>
+                    <small class="text-white-50" id="contChapterChemistry">Chapter 2: Atomic Structure</small>
+                  </div>
+                </div>
+                <div class="p-3 mt-auto">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-muted" id="contProgChemistry">60% Completed</span>
+                    <button class="btn btn-gradient-sm py-1 px-3" onclick="openBookViewer('Chemistry')">Continue <i class="fa-solid fa-arrow-right ms-1"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3" id="contCardEnglish">
+              <div class="glass-card overflow-hidden h-100 d-flex flex-column">
+                <div class="p-3 bg-gradient position-relative chapter-banner banner-english" style="background: linear-gradient(135deg, #831843, #be185d); height: 110px;">
+                  <div class="position-absolute bottom-0 start-0 m-3">
+                    <h6 class="fw-bold mb-0 text-white">English</h6>
+                    <small class="text-white-50" id="contChapterEnglish">Chapter 7: The Village</small>
+                  </div>
+                </div>
+                <div class="p-3 mt-auto">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-muted" id="contProgEnglish">80% Completed</span>
+                    <button class="btn btn-gradient-sm py-1 px-3" onclick="openBookViewer('English')">Continue <i class="fa-solid fa-arrow-right ms-1"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Widgets Grid -->
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="glass-card p-3 h-100" onclick="showSection('progress')" style="cursor: pointer;">
+                <h6 class="fw-bold mb-3">Progress Overview</h6>
+                <div class="d-flex align-items-center gap-3">
+                  <div class="big-circle-chart" id="circleChartBig">
+                    <div>
+                      <h5 class="fw-bold mb-0" id="bigChartVal">72%</h5>
+                      <small class="text-muted" style="font-size: 0.65rem;">Overall</small>
+                    </div>
+                  </div>
+                  <div class="small">
+                    <div class="mb-1"><span class="badge bg-primary rounded-circle p-1 me-1"></span> Chapters: <b id="overviewChapters">18/25</b></div>
+                    <div class="mb-1"><span class="badge bg-info rounded-circle p-1 me-1"></span> Tests: <b id="overviewTests">12/20</b></div>
+                    <div class="mb-1"><span class="badge bg-warning rounded-circle p-1 me-1"></span> MCQs: <b>482/600</b></div>
+                    <div><span class="badge bg-success rounded-circle p-1 me-1"></span> Streak: <b class="streak-count-badge">0 Days</b></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="glass-card p-3 h-100" onclick="showSection('achievements')" style="cursor: pointer;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0">Achievements</h6>
+                  <span class="text-primary small">View All →</span>
+                </div>
+                <div class="row g-2 text-center" id="dashboardAchievementsRow">
+                  <!-- Filled dynamically by renderAchievements() from real stats -->
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="glass-card p-3 h-100">
+                <h6 class="fw-bold mb-3">Quick Access</h6>
+                <div class="row g-2 text-center">
+                  <div class="col-3" onclick="showSection('stickynotes')"><div class="quick-icon-btn"><i class="fa-solid fa-sticky-note text-warning"></i><small class="d-block mt-1" style="font-size:0.65rem;">Notes</small></div></div>
+                  <div class="col-3" onclick="showSection('chapters')"><div class="quick-icon-btn"><i class="fa-solid fa-circle-question text-info"></i><small class="d-block mt-1" style="font-size:0.65rem;">Solutions</small></div></div>
+                  <div class="col-3" onclick="showSection('tests')"><div class="quick-icon-btn"><i class="fa-solid fa-list-check text-primary"></i><small class="d-block mt-1" style="font-size:0.65rem;">MCQs</small></div></div>
+                  <div class="col-3" onclick="showSection('tests')"><div class="quick-icon-btn"><i class="fa-solid fa-file-pen text-success"></i><small class="d-block mt-1" style="font-size:0.65rem;">Tests</small></div></div>
+                  <div class="col-3" onclick="showSection('bookmarks')"><div class="quick-icon-btn"><i class="fa-solid fa-bookmark text-danger"></i><small class="d-block mt-1" style="font-size:0.65rem;">Saved</small></div></div>
+                  <div class="col-3" onclick="showSection('chapters')"><div class="quick-icon-btn"><i class="fa-solid fa-clock text-secondary"></i><small class="d-block mt-1" style="font-size:0.65rem;">Recent</small></div></div>
+                  <div class="col-3" onclick="showSection('results')"><div class="quick-icon-btn"><i class="fa-solid fa-chart-pie text-purple"></i><small class="d-block mt-1" style="font-size:0.65rem;">Report</small></div></div>
+                  <div class="col-3" onclick="showSection('achievements')"><div class="quick-icon-btn"><i class="fa-solid fa-trophy text-warning"></i><small class="d-block mt-1" style="font-size:0.65rem;">Badges</small></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Side Panel -->
+        <div class="col-xl-3 col-lg-4">
+          <div class="glass-panel p-3 mb-4 study-streak-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="fw-bold"><i class="fa-solid fa-fire text-warning me-1"></i> Study Streak</span>
+              <span class="badge bg-warning bg-opacity-20 text-warning px-2 py-1 rounded-pill streak-count-badge">0 Days</span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3" id="streakDotsRow">
+              <!-- Filled dynamically by renderStreakUI() from real login dates -->
+            </div>
+
+            <p class="text-warning text-center small mb-0" id="streakMessage">Log in daily to build your streak!</p>
+          </div>
+
+          <div class="glass-panel p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="fw-bold mb-0">Upcoming Test</h6>
+              <a onclick="showSection('tests')" class="text-primary small text-decoration-none" style="cursor: pointer;">View All →</a>
+            </div>
+
+            <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--card-border);">
+              <div class="d-flex gap-2 align-items-start mb-2">
+                <div class="rounded-3 p-2 bg-primary bg-opacity-20 text-primary"><i class="fa-solid fa-clipboard-question"></i></div>
+                <div>
+                  <h6 class="fw-bold mb-0 small" id="testTitle">Mathematics - Chapter 5 Test</h6>
+                  <small class="text-muted d-block" style="font-size: 0.7rem;"><i class="fa-regular fa-file-lines me-1"></i> 20 Questions • 20 Mins</small>
+                </div>
+              </div>
+              <small class="text-muted d-block mb-3" id="testScheduleText" style="font-size: 0.7rem;"><i class="fa-regular fa-calendar me-1"></i> --</small>
+              <button class="btn btn-gradient-sm w-100" id="startTestBtn" onclick="handleStartTestClick()">Start Test →</button>
+            </div>
+          </div>
+
+          <div class="glass-panel p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="fw-bold mb-0">Recent Activity</h6>
+            </div>
+
+            <div class="d-flex flex-column gap-3 small" id="recentActivityList">
+              <!-- Filled dynamically by renderRecentActivity() from real logged actions -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECTION 2: GENERIC DYNAMIC SECTION PAGE -->
+    <div id="genericSection" style="display: none;">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-outline-light rounded-circle p-2" onclick="showSection('dashboard')" style="width:40px; height:40px;"><i class="fa-solid fa-arrow-left"></i></button>
+          <h3 class="fw-bold mb-0" id="genericSectionTitle">Section Title</h3>
+        </div>
+        <span class="badge bg-primary px-3 py-2 rounded-pill fs-6" id="genericClassBadge">Class 10</span>
+      </div>
+      <div class="glass-panel p-4" id="genericSectionBody">
+        <!-- Content Loaded Dynamically -->
+      </div>
+    </div>
+
+    <!-- SECTION 3: BOOK / PDF READER VIEW -->
+    <div id="bookViewerSection" style="display: none;">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-outline-light rounded-circle p-2" onclick="showSection('dashboard')" style="width:40px; height:40px;"><i class="fa-solid fa-arrow-left"></i></button>
+          <div>
+            <h3 class="fw-bold mb-0" id="bookSubjectTitle">Mathematics Book</h3>
+            <small class="text-muted" id="bookClassSub">Class 10 • Full PDF Notes & Chapters</small>
+            <small class="text-muted d-block" id="bookProgressSummary" style="font-size: 0.75rem;"></small>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-gradient-sm" onclick="alert('PDF Downloaded successfully!')"><i class="fa-solid fa-download me-1"></i> Download PDF</button>
+          <button class="btn btn-outline-light rounded-2" onclick="showSection('dashboard')"><i class="fa-solid fa-xmark"></i> Close</button>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-3">
+          <div class="glass-panel p-3">
+            <h6 class="fw-bold mb-3"><i class="fa-solid fa-list me-2 text-primary"></i> Chapters & Topics</h6>
+            <div class="list-group list-group-flush bg-transparent" id="bookChaptersList">
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-9">
+          <div class="glass-panel p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <span class="fw-bold text-primary" id="currentReadingChapter"><i class="fa-solid fa-book-open me-2"></i> Reading: Chapter 1</span>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button class="btn btn-sm btn-secondary" id="prevPageBtn" onclick="goToPrevPage()" title="Previous Page"><i class="fa-solid fa-chevron-left"></i></button>
+                <span class="small text-muted" id="bookPageIndicator">Page 1 of 12</span>
+                <button class="btn btn-sm btn-secondary" id="nextPageBtn" onclick="goToNextPage()" title="Next Page"><i class="fa-solid fa-chevron-right"></i></button>
+                <button class="btn btn-sm btn-secondary" id="bookmarkPageBtn" onclick="toggleBookmarkCurrentPage()" title="Bookmark this page">
+                  <i class="fa-regular fa-bookmark me-1"></i> Bookmark
+                </button>
+              </div>
+            </div>
+
+            <iframe class="pdf-frame-wrapper" id="pdfViewerFrame" src="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: REDESIGNED UNIQUE PROFESSIONAL PROFILE & SETTINGS SECTION -->
+    <div id="profileSection" style="display: none;">
+      <div class="profile-page-header-bar d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <button class="btn btn-outline-light rounded-circle p-2" onclick="showSection('dashboard')" style="width:40px; height:40px;"><i class="fa-solid fa-arrow-left"></i></button>
+          <div class="section-icon-chip chip-purple">
+            <i class="fa-solid fa-user-gear"></i>
+          </div>
+          <div>
+            <h3 class="fw-bold mb-0">Student Profile Center</h3>
+            <small class="text-muted">Manage your personal, academic details, and picture</small>
+          </div>
+        </div>
+        <button class="btn btn-gradient-sm px-3 py-2" onclick="saveProfileChanges(event)"><i class="fa-solid fa-floppy-disk me-1"></i> Save Changes</button>
+      </div>
+
+      <div class="row g-4">
+        <!-- Left Column: Professional Photo Container Box & Quick Status -->
+        <div class="col-lg-4">
+          <div class="glass-panel p-4 text-center mb-4">
+            <div class="profile-section-title-bar d-flex align-items-center gap-2 mb-3 text-start">
+              <div class="section-icon-chip chip-purple" style="width:36px;height:36px;min-width:36px;font-size:0.95rem;">
+                <i class="fa-solid fa-image"></i>
+              </div>
+              <label class="form-label fw-bold text-white mb-0">Profile Picture</label>
+            </div>
+            
+            <!-- Picture Box Container with Upload/View/Crop Actions -->
+            <div class="profile-photo-upload-container mb-3" id="photoUploadBox">
+              
+              <!-- Real Photo Preview Element -->
+              <img id="profilePreviewImg" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80" alt="Student Profile" class="profile-img-preview" style="display: block;">
+
+              <!-- Upload Instruction Placeholder (Shown when no image or clicked) -->
+              <div class="upload-placeholder-content" id="uploadPlaceholder" style="display: none;" onclick="triggerPhotoUpload()">
+                <div class="upload-icon-circle">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <h6 class="fw-bold mb-1 text-white">Click to Upload Photo</h6>
+                <small class="text-muted d-block" style="font-size: 0.72rem;">Drag & drop or browse from your device</small>
+                <span class="badge bg-white bg-opacity-10 text-muted mt-2 fw-normal" style="font-size: 0.65rem;">PNG, JPG or WEBP (Max 5MB)</span>
+              </div>
+
+              <!-- Interactive Floating Action Toolbar for Photo -->
+              <div class="profile-img-overlay-actions">
+                <button type="button" class="btn btn-sm btn-dark text-white rounded-circle" onclick="triggerPhotoUpload()" title="Upload / Change Photo"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button type="button" class="btn btn-sm btn-dark text-info rounded-circle" onclick="viewPhotoModal()" title="View Full Photo"><i class="fa-solid fa-eye"></i></button>
+                <button type="button" class="btn btn-sm btn-dark text-warning rounded-circle" onclick="cropPhotoAction()" title="Crop / Adjust Photo"><i class="fa-solid fa-crop-simple"></i></button>
+                <button type="button" class="btn btn-sm btn-dark text-danger rounded-circle" onclick="removePhotoAction()" title="Remove Photo"><i class="fa-solid fa-trash"></i></button>
+              </div>
+
+              <!-- Hidden Real File Input -->
+              <input type="file" id="galleryUploadInput" accept="image/*" class="d-none" onchange="handleGalleryUpload(event)">
+            </div>
+
+            <h4 class="fw-bold mb-1 text-white" id="profileDisplayName">Ahmed Khan</h4>
+            <p class="text-muted small mb-2" id="profileDisplayTag">@ahmed_khan10</p>
+            <span class="badge bg-purple bg-opacity-20 text-purple border border-purple border-opacity-30 px-3 py-1 rounded-pill mb-2" id="profileDisplayClass">Class 10 Student</span>
+          </div>
+
+          <div class="glass-panel p-3">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <div class="section-icon-chip chip-blue" style="width:36px;height:36px;min-width:36px;font-size:0.95rem;">
+                <i class="fa-solid fa-graduation-cap"></i>
+              </div>
+              <h6 class="fw-bold mb-0">Academic Summary</h6>
+            </div>
+            <div class="academic-stat-row small">
+              <span class="text-muted">Target Grade:</span>
+              <span class="fw-bold text-success">A+ (90%+)</span>
+            </div>
+            <div class="academic-stat-row small">
+              <span class="text-muted">Current Roll No:</span>
+              <span class="fw-bold text-white">#1042-B</span>
+            </div>
+            <div class="academic-stat-row small mb-0">
+              <span class="text-muted">Major Group:</span>
+              <span class="fw-bold text-warning">Computer Science</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Professional Profile Edit Form -->
+        <div class="col-lg-8">
+          <div class="glass-panel p-4">
+            <div class="d-flex align-items-center gap-2 mb-4 border-bottom border-white border-opacity-10 pb-3">
+              <div class="section-icon-chip chip-pink">
+                <i class="fa-solid fa-id-card"></i>
+              </div>
+              <h5 class="fw-bold mb-0">Personal & Educational Information</h5>
+            </div>
+
+            <form id="profileUpdateForm" onsubmit="saveProfileChanges(event)">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Full Name</label>
+                  <div class="profile-input-group accent-purple">
+                    <i class="fa-solid fa-user input-icon"></i>
+                    <input type="text" id="profFullName" class="form-control profile-input" value="Ahmed Khan" placeholder="e.g. Ahmed Khan" required>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Username</label>
+                  <div class="profile-input-group accent-pink">
+                    <i class="fa-solid fa-at input-icon"></i>
+                    <input type="text" id="profUsername" class="form-control profile-input" value="ahmed_khan10" placeholder="e.g. ahmed_khan10" required>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Select Current Class</label>
+                  <div class="profile-input-group accent-blue">
+                    <i class="fa-solid fa-graduation-cap input-icon"></i>
+                    <select id="profClassSelect" class="form-select profile-input">
+                      <option value="Class 9">Class 9</option>
+                      <option value="Class 10" selected>Class 10</option>
+                      <option value="Class 11">Class 11</option>
+                      <option value="Class 12">Class 12</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Roll Number / Student ID</label>
+                  <div class="profile-input-group accent-amber">
+                    <i class="fa-solid fa-id-badge input-icon"></i>
+                    <input type="text" id="profRollNo" class="form-control profile-input" value="1042-B" placeholder="e.g. 1042-B">
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">School / Institution Name</label>
+                  <div class="profile-input-group accent-green">
+                    <i class="fa-solid fa-school input-icon"></i>
+                    <input type="text" id="profSchool" class="form-control profile-input" value="Army Public School & College" placeholder="Enter school or college name">
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Educational Board</label>
+                  <div class="profile-input-group accent-blue">
+                    <i class="fa-solid fa-landmark input-icon"></i>
+                    <input type="text" id="profBoard" class="form-control profile-input" value="FBISE Islamabad / Punjab Board" placeholder="e.g. FBISE Islamabad">
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Email Address</label>
+                  <div class="profile-input-group accent-purple">
+                    <i class="fa-solid fa-envelope input-icon"></i>
+                    <input type="email" id="profEmail" class="form-control profile-input" value="ahmed.khan@gmail.com" placeholder="e.g. student@gmail.com" required>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Phone Number</label>
+                  <div class="profile-input-group accent-pink">
+                    <i class="fa-solid fa-phone input-icon"></i>
+                    <input type="tel" id="profPhone" class="form-control profile-input" value="+92 300 1234567" placeholder="+92 300 0000000">
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">City & Country</label>
+                  <div class="profile-input-group accent-amber">
+                    <i class="fa-solid fa-location-dot input-icon"></i>
+                    <input type="text" id="profCity" class="form-control profile-input" value="Lahore, Pakistan" placeholder="e.g. Lahore, Pakistan">
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted">Major Study Group</label>
+                  <div class="profile-input-group accent-green">
+                    <i class="fa-solid fa-book-bookmark input-icon"></i>
+                    <input type="text" id="profGroup" class="form-control profile-input" value="Computer Science & Mathematics" placeholder="e.g. Pre-Engineering / CS">
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small fw-semibold text-muted">Personal Bio & Learning Target</label>
+                  <div class="profile-input-group accent-purple">
+                    <i class="fa-solid fa-pen-nib input-icon" style="top: 20px;"></i>
+                    <textarea id="profBio" class="form-control profile-input" rows="3" placeholder="Write a brief goal statement or bio...">Targeting 95%+ marks in Board Examinations and mastering Computer Science concepts!</textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-3 mt-4 pt-3 border-top border-white border-opacity-10">
+                <button type="button" class="btn btn-outline-light px-4 rounded-3" onclick="showSection('dashboard')">Cancel</button>
+                <button type="submit" class="btn btn-gradient-sm px-4 py-2"><i class="fa-solid fa-floppy-disk me-1"></i> Save Profile Details</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Interactive Test Modal -->
+  <div class="modal fade" id="testModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white" style="background: #171038;">
+        <div class="modal-header border-0">
+          <h5 class="modal-header-title fw-bold" id="modalTestTitle">Mathematics - Chapter 5 Test</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="resetTestModal()"></button>
+        </div>
+        <div class="modal-body py-4" id="testModalBody">
+          <!-- Filled dynamically: intro / questions / result -->
+        </div>
+        <div class="modal-footer border-0 justify-content-center" id="testModalFooter">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Viewer Modal -->
+  <div class="modal fade" id="viewPhotoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white text-center p-3" style="background: rgba(15, 10, 36, 0.95);">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 fw-bold"><i class="fa-solid fa-image me-2 text-purple"></i> Profile Photo Preview</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="p-2">
+          <img id="fullPhotoModalImg" src="" alt="Full Preview" class="img-fluid rounded-4 shadow-lg" style="max-height: 400px; object-fit: contain;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Crop Modal (Real Cropper.js Tool) -->
+  <div class="modal fade" id="cropPhotoModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white p-3" style="background: rgba(15, 10, 36, 0.97);">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0 fw-bold"><i class="fa-solid fa-crop-simple me-2 text-warning"></i> Crop & Adjust Your Photo</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="destroyCropper()"></button>
+        </div>
+        <div class="cropper-modal-image-wrapper">
+          <img id="cropperSourceImage" src="" alt="Crop Source">
+        </div>
+        <div class="d-flex align-items-center gap-3 mt-3">
+          <i class="fa-solid fa-magnifying-glass-minus text-muted"></i>
+          <input type="range" class="form-range flex-grow-1" id="cropZoomRange" min="-1" max="1" step="0.05" value="0" oninput="cropperZoom(this.value)">
+          <i class="fa-solid fa-magnifying-glass-plus text-muted"></i>
+        </div>
+        <div class="d-flex justify-content-center gap-2 mt-2">
+          <button type="button" class="btn btn-sm btn-outline-light rounded-circle" style="width:38px;height:38px;" onclick="cropperRotate(-45)" title="Rotate Left"><i class="fa-solid fa-rotate-left"></i></button>
+          <button type="button" class="btn btn-sm btn-outline-light rounded-circle" style="width:38px;height:38px;" onclick="cropperRotate(45)" title="Rotate Right"><i class="fa-solid fa-rotate-right"></i></button>
+          <button type="button" class="btn btn-sm btn-outline-light rounded-circle" style="width:38px;height:38px;" onclick="cropperReset()" title="Reset"><i class="fa-solid fa-arrows-rotate"></i></button>
+        </div>
+        <div class="d-flex justify-content-end gap-3 mt-4 pt-3 border-top border-white border-opacity-10">
+          <button type="button" class="btn btn-outline-light px-4 rounded-3" data-bs-dismiss="modal" onclick="destroyCropper()">Cancel</button>
+          <button type="button" class="btn btn-gradient-sm px-4" onclick="applyCroppedPhoto()"><i class="fa-solid fa-check me-1"></i> Apply Crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Update Success Popup -->
+  <div class="modal fade" id="updateSuccessModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white text-center p-4" style="background: rgba(15, 10, 36, 0.97);">
+        <div class="success-check-circle">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <h5 class="fw-bold mb-1">Profile Updated!</h5>
+        <p class="text-muted small mb-3" id="updateSuccessMsg">Your profile details were saved successfully.</p>
+        <button type="button" class="btn btn-gradient-sm px-4 mx-auto" data-bs-dismiss="modal">Great, Thanks!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Locked Popup -->
+  <div class="modal fade" id="testLockedModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white text-center p-4" style="background: rgba(15, 10, 36, 0.97);">
+        <i class="fa-solid fa-lock text-warning display-5 mb-3"></i>
+        <h5 class="fw-bold mb-1">Test Not Open Yet</h5>
+        <p class="text-muted small mb-3" id="testLockedMsg">This test isn't open yet.</p>
+        <button type="button" class="btn btn-gradient-sm px-4 mx-auto" data-bs-dismiss="modal">Okay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticky Note Composer / Editor Modal (Add + Edit share this) -->
+  <div class="modal fade" id="stickyNoteModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white" style="background: rgba(15, 10, 36, 0.97);">
+        <div class="modal-header border-0">
+          <h5 class="modal-header-title fw-bold" id="stickyNoteModalTitle"><i class="fa-solid fa-note-sticky me-2 text-warning"></i> New Sticky Note</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3">
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Heading <span class="text-muted" style="font-size:0.7rem;">(optional)</span></label>
+            <input type="text" id="stickyNoteHeadingInput" class="form-control themed-field" placeholder="e.g. Photosynthesis Formula" maxlength="60" oninput="updateStickyPreview()">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Note</label>
+            <textarea id="stickyNoteTextInput" class="form-control themed-field" rows="4" placeholder="Write your note here..." oninput="updateStickyPreview()"></textarea>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-muted mb-2 d-block">Sticky Color</label>
+              <div class="d-flex gap-2 flex-wrap" id="stickyColorPicker">
+                <button type="button" class="sticky-color-swatch" data-color="red" style="background:#ef4444;" onclick="selectStickyColor('red')" title="Red"></button>
+                <button type="button" class="sticky-color-swatch" data-color="blue" style="background:#3b82f6;" onclick="selectStickyColor('blue')" title="Blue"></button>
+                <button type="button" class="sticky-color-swatch" data-color="yellow" style="background:#f59e0b;" onclick="selectStickyColor('yellow')" title="Yellow"></button>
+                <button type="button" class="sticky-color-swatch" data-color="green" style="background:#22c55e;" onclick="selectStickyColor('green')" title="Green"></button>
+                <button type="button" class="sticky-color-swatch" data-color="purple" style="background:#a855f7;" onclick="selectStickyColor('purple')" title="Purple"></button>
+                <button type="button" class="sticky-color-swatch" data-color="parrot" style="background:#84cc16;" onclick="selectStickyColor('parrot')" title="Parrot Green"></button>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label small text-muted mb-1">Text Color</label>
+              <select id="stickyTextColorSelect" class="form-select themed-field" onchange="updateStickyPreview()">
+                <option value="black">Black</option>
+                <option value="white">White</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label small text-muted mb-1">Font Size</label>
+              <select id="stickyFontSizeSelect" class="form-select themed-field" onchange="updateStickyPreview()">
+                <option value="14">Small</option>
+                <option value="16" selected>Medium</option>
+                <option value="20">Large</option>
+                <option value="24">X-Large</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small text-muted mb-1">Diagram / Image <span class="text-muted" style="font-size:0.7rem;">(optional)</span></label>
+            <input type="file" accept="image/*" id="stickyImageInput" class="form-control themed-field" onchange="handleStickyImageUpload(event)">
+            <div class="mt-2 align-items-center gap-2" id="stickyImagePreviewWrap" style="display:none;">
+              <img id="stickyImagePreview" src="" alt="Diagram preview" style="max-height:110px; border-radius:10px;" class="img-fluid">
+              <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removeStickyImage()"><i class="fa-solid fa-trash me-1"></i>Remove Image</button>
+            </div>
+          </div>
+
+          <label class="form-label small text-muted mb-1">Live Preview</label>
+          <div class="row g-3" id="stickyNoteLivePreview"></div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-gradient-sm px-4" onclick="saveStickyNoteFromModal()"><i class="fa-solid fa-check me-1"></i> Save Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Sticky Note Modal — a clean, full-size readable view of a saved note -->
+  <div class="modal fade" id="viewStickyNoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content glass-panel border border-white border-opacity-20 text-white" style="background: rgba(15, 10, 36, 0.97);">
+        <div class="modal-header border-0">
+          <h5 class="modal-header-title fw-bold"><i class="fa-solid fa-eye me-2 text-warning"></i> Sticky Note</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3" id="viewStickyNoteBody">
+          <!-- Filled dynamically with the real saved note -->
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-gradient-sm px-4" id="viewStickyNoteEditBtn"><i class="fa-solid fa-pen me-1"></i> Edit Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+  <!-- /#appShell -->
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Cropper.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+  <script>
+    /* ============================================================
+       REAL PROGRESS ENGINE
+       ------------------------------------------------------------
+       Every subject now tracks chaptersTotal + chaptersDone (a real
+       count, not a fixed percentage). All progress percentages —
+       Overall Progress, per-subject %, subject progress bars, the
+       "Continue Where You Left Off" banners, the donut charts, and
+       the "Completed Chapters" stat — are COMPUTED from these counts
+       at render time via getClassStats()/renderStatsForClass(),
+       never hardcoded again. There is deliberately no manual
+       "Mark as Complete" button anywhere (that would let a student
+       flag every chapter done for free) — chaptersDone only moves
+       together with real test activity.
+       Tests work the same way: testsAttempted only increases when a
+       test is actually taken to completion in the Test Modal
+       (submitCurrentTest), capped at testsTotal.
+       All of this is persisted to localStorage (saveProgress/
+       loadProgress) so it survives refresh/logout, and the "+X%",
+       "+X new", "+X more" delta badges are measured against a
+       per-session baseline (sessionBaseline) captured once per class
+       when it's first viewed this session — so they always reflect
+       real work done in this sitting, never a fixed fake number.
+       ============================================================ */
+    const classDatasets = {
+      "Class 9": {
+        testTitle: "Physics - Motion & Force Test",
+        testsTotal: 15, testsAttempted: 8,
+        subjects: [
+          { name: "Mathematics", chaptersTotal: 12, chaptersDone: 8, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 10, chaptersDone: 6, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 11, chaptersDone: 6, color: "#f97316", icon: "fa-flask" },
+          { name: "Biology", chaptersTotal: 9, chaptersDone: 7, color: "#10b981", icon: "fa-leaf" },
+          { name: "English", chaptersTotal: 10, chaptersDone: 7, color: "#ec4899", icon: "fa-book" },
+          { name: "Computer", chaptersTotal: 8, chaptersDone: 6, color: "#3b82f6", icon: "fa-desktop" }
+        ]
+      },
+      "Class 10": {
+        testTitle: "Mathematics - Chapter 5 Test",
+        testsTotal: 20, testsAttempted: 12,
+        subjects: [
+          { name: "Mathematics", chaptersTotal: 15, chaptersDone: 14, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 14, chaptersDone: 10, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 13, chaptersDone: 8, color: "#f97316", icon: "fa-flask" },
+          { name: "Biology", chaptersTotal: 12, chaptersDone: 9, color: "#10b981", icon: "fa-leaf" },
+          { name: "English", chaptersTotal: 12, chaptersDone: 10, color: "#ec4899", icon: "fa-book" },
+          { name: "Urdu", chaptersTotal: 11, chaptersDone: 7, color: "#8b5cf6", icon: "fa-feather" },
+          { name: "Pakistan Studies", chaptersTotal: 10, chaptersDone: 6, color: "#059669", icon: "fa-landmark" },
+          { name: "Computer Science", chaptersTotal: 10, chaptersDone: 9, color: "#3b82f6", icon: "fa-desktop" }
+        ]
+      },
+      "Class 11": {
+        testTitle: "Advanced Math - Vectors Test",
+        testsTotal: 12, testsAttempted: 6,
+        subjects: [
+          { name: "Mathematics", chaptersTotal: 16, chaptersDone: 7, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 15, chaptersDone: 8, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 14, chaptersDone: 6, color: "#f97316", icon: "fa-flask" },
+          { name: "Computer Science", chaptersTotal: 12, chaptersDone: 7, color: "#3b82f6", icon: "fa-desktop" },
+          { name: "English", chaptersTotal: 10, chaptersDone: 7, color: "#ec4899", icon: "fa-book" }
+        ]
+      },
+      "Class 12": {
+        testTitle: "Calculus - Integration Mock Test",
+        testsTotal: 20, testsAttempted: 16,
+        subjects: [
+          { name: "Mathematics", chaptersTotal: 14, chaptersDone: 12, color: "#6366f1", icon: "fa-shapes" },
+          { name: "Physics", chaptersTotal: 12, chaptersDone: 10, color: "#06b6d4", icon: "fa-atom" },
+          { name: "Chemistry", chaptersTotal: 13, chaptersDone: 10, color: "#f97316", icon: "fa-flask" },
+          { name: "Computer Science", chaptersTotal: 10, chaptersDone: 9, color: "#3b82f6", icon: "fa-desktop" }
+        ]
+      }
+    };
+
+    /* ---- Real scheduled test times: each class's next test unlocks at a
+       real future moment (computed from the real clock when the page loads),
+       not a hardcoded past date. Until that exact moment arrives, the test
+       stays locked and clicking it only shows the unlock time — it never
+       opens early. Once that real time passes, it opens on its own. ---- */
+    classDatasets["Class 9"].testDateTime  = new Date(Date.now() + 2  * 60 * 60 * 1000);
+    classDatasets["Class 10"].testDateTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    classDatasets["Class 11"].testDateTime = new Date(Date.now() + 3  * 24 * 60 * 60 * 1000);
+    classDatasets["Class 12"].testDateTime = new Date(Date.now() + 6  * 60 * 60 * 1000);
+
+    /* Real test duration per class, shown in the notification detail box. */
+    classDatasets["Class 9"].testDurationMinutes  = 40;
+    classDatasets["Class 10"].testDurationMinutes = 45;
+    classDatasets["Class 11"].testDurationMinutes = 50;
+    classDatasets["Class 12"].testDurationMinutes = 60;
+
+    function isTestUnlocked(className) {
+      const data = classDatasets[className];
+      return !data.testDateTime || Date.now() >= data.testDateTime.getTime();
+    }
+
+    function formatTestSchedule(dt) {
+      if (!dt) return '--';
+      const dateStr = dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+      const timeStr = dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      return `${dateStr} • ${timeStr}`;
+    }
+
+    /* ============================================================
+       REAL NOTIFICATIONS
+       Built entirely from real app data — every class's real upcoming
+       test schedule and lock/unlock state — nothing here is a fake
+       placeholder. A test only stops notifying once it's actually
+       been attempted. Read-state is remembered in localStorage so the
+       badge count only shows genuinely unseen notifications.
+       ============================================================ */
+    function getNotifications() {
+      const list = [];
+      const sessionUser = getSessionUser();
+      const targetClass = sessionUser ? sessionUser.className : currentSelectedClass;
+      const data = classDatasets[targetClass];
+      if (data && data.testsAttempted < data.testsTotal) {
+        list.push({
+          id: `${targetClass}::${data.testTitle}`,
+          className: targetClass,
+          testTitle: data.testTitle,
+          testDateTime: data.testDateTime,
+          unlocked: isTestUnlocked(targetClass)
+        });
+      }
+      return list;
+    }
+
+    function getReadNotificationIds() {
+      try { return JSON.parse(localStorage.getItem('studymate_notifs_read_v1')) || []; }
+      catch (e) { return []; }
+    }
+    function markAllNotificationsRead(ids) {
+      try { localStorage.setItem('studymate_notifs_read_v1', JSON.stringify(ids)); } catch (e) { /* ignore */ }
+    }
+
+    function updateNotifBadge() {
+      const notifs = getNotifications();
+      const readIds = getReadNotificationIds();
+      const unreadCount = notifs.filter(n => !readIds.includes(n.id)).length;
+      const badge = document.getElementById('notifBellBadge');
+      if (!badge) return;
+      if (unreadCount > 0) {
+        badge.innerText = unreadCount > 9 ? '9+' : String(unreadCount);
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    /* Toggles the inline "test details" box under a notification card —
+       stays on the notifications page, never navigates anywhere. */
+    function toggleNotifDetail(detailId) {
+      const el = document.getElementById(detailId);
+      if (!el) return;
+      el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+    }
+
+    function renderNotificationsPage() {
+      const notifs = getNotifications();
+      const titleEl = document.getElementById('genericSectionTitle');
+      const badgeEl = document.getElementById('genericClassBadge');
+      const bodyEl = document.getElementById('genericSectionBody');
+
+      titleEl.innerHTML = `<i class="fa-solid fa-bell me-2 text-warning"></i> Notifications`;
+      badgeEl.innerText = notifs.length ? `${notifs.length} Update${notifs.length === 1 ? '' : 's'}` : 'All Caught Up';
+
+      if (!notifs.length) {
+        bodyEl.innerHTML = `
+          <div class="text-center py-5">
+            <div class="section-icon-chip chip-green mx-auto mb-3" style="width:64px; height:64px; font-size:1.6rem;">
+              <i class="fa-solid fa-check"></i>
+            </div>
+            <h6 class="fw-bold mb-1">You're all caught up!</h6>
+            <p class="text-muted small mb-0">No pending tests right now — new ones will show up here.</p>
+          </div>
+        `;
+      } else {
+        const mcqCount = quizQuestions.filter(q => q.type === 'mcq').length;
+        const shortCount = quizQuestions.filter(q => q.type === 'short').length;
+        const longCount = quizQuestions.filter(q => q.type === 'long').length;
+
+        bodyEl.innerHTML = notifs.map((n, idx) => {
+          const data = classDatasets[n.className];
+          const relatedSubject = data.subjects.find(s => n.testTitle.includes(s.name)) || data.subjects[0];
+          const detailId = `notifDetail${idx}`;
+          const chip = n.unlocked ? 'chip-green' : 'chip-blue';
+          const icon = n.unlocked ? 'fa-circle-check' : 'fa-clock';
+          const statusBadge = n.unlocked
+            ? `<span class="badge bg-success bg-opacity-20 text-success px-2 py-1 rounded-pill">Available Now</span>`
+            : `<span class="notif-upcoming-pill"><span class="notif-pulse-dot"></span> Upcoming</span>`;
+          const attemptBtn = n.unlocked
+            ? `<button class="btn btn-gradient-sm btn-sm" onclick="switchClass('${n.className}'); showSection('tests');">Attempt Now <i class="fa-solid fa-arrow-right ms-1"></i></button>`
+            : '';
+
+          return `
+            <div class="glass-card p-3 mb-3">
+              <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="section-icon-chip ${chip}"><i class="fa-solid ${icon}"></i></div>
+                <div class="flex-grow-1" style="min-width:200px;">
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <h6 class="fw-bold mb-0">New Test: ${n.testTitle}</h6>
+                    ${statusBadge}
+                  </div>
+                  <small class="text-muted d-block">${n.className} • <i class="fa-regular fa-calendar me-1"></i>${formatTestSchedule(n.testDateTime)}</small>
+                </div>
+                <div class="d-flex gap-2">
+                  ${attemptBtn}
+                  <button class="btn btn-outline-light btn-sm rounded-3" onclick="toggleNotifDetail('${detailId}')">View Details</button>
+                </div>
+              </div>
+
+              <div id="${detailId}" class="notif-detail-box mt-3" style="display:none;">
+                <p class="mb-2">Aapki <b>${n.className}</b> ka test <b>${formatTestSchedule(n.testDateTime)}</b> par hai.</p>
+                <p class="mb-2">Is test mein total <b>${mcqCount} MCQs</b>, <b>${shortCount} Short question${shortCount === 1 ? '' : 's'}</b> aur <b>${longCount} Long question${longCount === 1 ? '' : 's'}</b> honge.</p>
+                <p class="mb-2">Yeh <b>${relatedSubject.name}</b> ki book se ${relatedSubject.chaptersDone} chapters (Chapter 1 se Chapter ${relatedSubject.chaptersDone} tak) mese aayega.</p>
+                <p class="mb-2">Is test ka duration <b>${data.testDurationMinutes} minutes</b> hoga.</p>
+                <p class="mb-0">${mcqCount} MCQs mein se aapko <b>${mcqCount}</b> attempt karne honge, ${shortCount} Short mein se <b>${shortCount}</b> karne honge, aur ${longCount} Long mein se <b>${longCount}</b> karna hoga.</p>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      /* Opening the page marks every currently-listed notification as read,
+         so the bell badge clears — exactly the ones actually shown here. */
+      markAllNotificationsRead(notifs.map(n => n.id));
+      updateNotifBadge();
+    }
+
+    function renderUpcomingTest(className) {
+      const data = classDatasets[className];
+      const scheduleEl = document.getElementById('testScheduleText');
+      if (scheduleEl) scheduleEl.innerHTML = `<i class="fa-regular fa-calendar me-1"></i> ${formatTestSchedule(data.testDateTime)}`;
+
+      const unlocked = isTestUnlocked(className);
+      const btn = document.getElementById('startTestBtn');
+      if (btn) {
+        btn.innerHTML = unlocked ? 'Start Test →' : '<i class="fa-solid fa-lock me-1"></i> Locked';
+      }
+    }
+
+    /* Clicking a locked test never opens it — it always shows this popup
+       with the real unlock date/time instead. */
+    function showTestLockedPopup(className) {
+      const data = classDatasets[className || currentSelectedClass];
+      document.getElementById('testLockedMsg').innerText =
+        `This test will open on ${formatTestSchedule(data.testDateTime)}. Please come back then.`;
+      new bootstrap.Modal(document.getElementById('testLockedModal')).show();
+    }
+
+    let currentSelectedClass = "Class 10";
+    let stickyNotes = [];
+    let sessionBaseline = {};
+
+    /* ---- Persistence: keep real progress across refresh/logout ---- */
+    function saveProgress() {
+      try {
+        const snapshot = { subjects: {}, tests: {}, notes: stickyNotes };
+        Object.keys(classDatasets).forEach(cls => {
+          snapshot.tests[cls] = classDatasets[cls].testsAttempted;
+          snapshot.subjects[cls] = {};
+          classDatasets[cls].subjects.forEach(s => { snapshot.subjects[cls][s.name] = s.chaptersDone; });
+        });
+        localStorage.setItem('studymate_progress_v1', JSON.stringify(snapshot));
+      } catch (e) { /* storage unavailable — progress just won't persist */ }
+    }
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem('studymate_progress_v1');
+        if (!raw) return;
+        const snap = JSON.parse(raw);
+        if (Array.isArray(snap.notes)) stickyNotes = snap.notes;
+        Object.keys(classDatasets).forEach(cls => {
+          if (snap.tests && typeof snap.tests[cls] === 'number') {
+            classDatasets[cls].testsAttempted = Math.min(snap.tests[cls], classDatasets[cls].testsTotal);
+          }
+          if (snap.subjects && snap.subjects[cls]) {
+            classDatasets[cls].subjects.forEach(s => {
+              if (typeof snap.subjects[cls][s.name] === 'number') {
+                s.chaptersDone = Math.max(0, Math.min(snap.subjects[cls][s.name], s.chaptersTotal));
+              }
+            });
+          }
+        });
+      } catch (e) { /* corrupted/blocked storage — fall back to defaults */ }
+    }
+
+    /* ============================================================
+       REAL STUDY STREAK
+       Counts consecutive real calendar days the student has opened
+       the app. On each load: if last visit was yesterday, streak++;
+       if it was today already, nothing changes; if a day (or more)
+       was missed, the streak breaks and restarts at 1 from today.
+       Persisted in localStorage so it survives refresh/logout.
+       ============================================================ */
+    function updateStreak() {
+      let data = { count: 0, lastDate: null, history: [] };
+      try {
+        const raw = localStorage.getItem('studymate_streak_v1');
+        if (raw) data = JSON.parse(raw);
+        if (!Array.isArray(data.history)) data.history = [];
+      } catch (e) { /* corrupted/blocked storage — start fresh */ }
+
+      const today = new Date().toDateString();
+      if (data.lastDate !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        data.count = (data.lastDate === yesterday) ? (data.count + 1) : 1;
+        data.lastDate = today;
+        data.history.push(today);
+        data.history = data.history.slice(-14);
+        try { localStorage.setItem('studymate_streak_v1', JSON.stringify(data)); } catch (e) { /* ignore */ }
+        logActivity('login', `Logged in — streak now ${data.count} day${data.count === 1 ? '' : 's'}`);
+      }
+      window.studyStreak = data;
+    }
+
+    function renderStreakUI() {
+      const streak = window.studyStreak || { count: 0, history: [] };
+      document.querySelectorAll('.streak-count-badge').forEach(el => {
+        el.innerText = `${streak.count} Day${streak.count === 1 ? '' : 's'}`;
+      });
+
+      const dotsContainer = document.getElementById('streakDotsRow');
+      if (dotsContainer) {
+        const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        let html = '';
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 86400000);
+          const studied = streak.history.includes(d.toDateString());
+          html += `
+            <div class="text-center">
+              <div class="streak-dot ${studied ? 'streak-active' : ''}">${studied ? '<i class="fa-solid fa-check"></i>' : ''}</div>
+              <small class="text-muted" style="font-size: 0.65rem;">${dayLabels[d.getDay()]}</small>
+            </div>
+          `;
+        }
+        dotsContainer.innerHTML = html;
+      }
+
+      const msgEl = document.getElementById('streakMessage');
+      if (msgEl) {
+        msgEl.innerText = streak.count >= 7 ? 'Excellent! Keep it up! 👏'
+          : streak.count >= 2 ? "You're on a roll — don't break it!"
+          : streak.count === 1 ? 'Great start — come back tomorrow to grow your streak!'
+          : 'Log in daily to build your streak!';
+      }
+    }
+
+    /* ============================================================
+       REAL RECENT ACTIVITY LOG
+       Every entry here comes from something the student actually
+       did (logged in, submitted a test) — nothing here is invented.
+       ============================================================ */
+    function logActivity(type, text) {
+      let log = [];
+      try {
+        const raw = localStorage.getItem('studymate_activity_v1');
+        if (raw) log = JSON.parse(raw);
+        if (!Array.isArray(log)) log = [];
+      } catch (e) { log = []; }
+      log.unshift({ type, text, ts: Date.now() });
+      log = log.slice(0, 20);
+      try { localStorage.setItem('studymate_activity_v1', JSON.stringify(log)); } catch (e) { /* ignore */ }
+      renderRecentActivity();
+    }
+
+    function relativeTime(ts) {
+      const diffMs = Date.now() - ts;
+      const mins = Math.floor(diffMs / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      const days = Math.floor(hrs / 24);
+      return `${days}d ago`;
+    }
+
+    const activityIcons = {
+      signup: { icon: 'fa-user-plus', chip: 'chip-amber' },
+      login:  { icon: 'fa-right-to-bracket', chip: 'chip-blue' },
+      logout: { icon: 'fa-right-from-bracket', chip: 'chip-red' },
+      test:   { icon: 'fa-award', chip: 'chip-purple' },
+      chapter:{ icon: 'fa-check', chip: 'chip-green' }
+    };
+
+    function renderRecentActivity() {
+      const container = document.getElementById('recentActivityList');
+      if (!container) return;
+      let log = [];
+      try {
+        const raw = localStorage.getItem('studymate_activity_v1');
+        if (raw) log = JSON.parse(raw);
+      } catch (e) { log = []; }
+
+      if (!log.length) {
+        container.innerHTML = `<p class="text-muted small mb-0">No activity yet — attempt a test to see your real activity here.</p>`;
+        return;
+      }
+
+      container.innerHTML = log.slice(0, 5).map(item => {
+        const meta = activityIcons[item.type] || activityIcons.login;
+        return `
+          <div class="d-flex align-items-center gap-3">
+            <div class="section-icon-chip ${meta.chip}"><i class="fa-solid ${meta.icon}"></i></div>
+            <div class="flex-grow-1">
+              <p class="mb-0 fw-semibold" style="font-size: 0.78rem;">${item.text}</p>
+              <small class="text-muted" style="font-size: 0.68rem;">${relativeTime(item.ts)}</small>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* ============================================================
+       REAL ACHIEVEMENTS
+       Every badge's earned/locked state is computed live from real
+       numbers (tests attempted, streak length, overall %) — nothing
+       is hardcoded as "earned" here.
+       ============================================================ */
+    function getAchievementDefs(className) {
+      const st = getClassStats(className);
+      const streak = (window.studyStreak || { count: 0 }).count;
+      return [
+        { title: 'First Test', desc: 'Complete your first test', icon: 'fa-star', earned: classDatasets[className].testsAttempted >= 1 },
+        { title: '3 Day Streak', desc: 'Log in 3 days in a row', icon: 'fa-fire', earned: streak >= 3 },
+        { title: '7 Day Streak', desc: 'Log in 7 days in a row', icon: 'fa-fire', earned: streak >= 7 },
+        { title: 'Halfway There', desc: 'Reach 50% overall progress', icon: 'fa-chart-line', earned: st.overallPct >= 50 },
+        { title: 'Test Regular', desc: 'Attempt 5 tests', icon: 'fa-clipboard-check', earned: classDatasets[className].testsAttempted >= 5 },
+        { title: 'Almost There', desc: 'Reach 90% overall progress', icon: 'fa-trophy', earned: st.overallPct >= 90 }
+      ];
+    }
+
+    function achievementCardHtml(a) {
+      return `
+        <div class="p-2 glass-card border rounded-3" style="${a.earned ? '' : 'opacity:0.45;'}">
+          <i class="fa-solid ${a.icon} ${a.earned ? 'text-warning' : 'text-muted'} fs-4 mb-1"></i>
+          <h6 class="fw-bold mb-0 small">${a.title}</h6>
+          <small class="text-muted" style="font-size: 0.65rem;">${a.earned ? a.desc : 'Locked • ' + a.desc}</small>
+        </div>
+      `;
+    }
+
+    function renderAchievements(className) {
+      const defs = getAchievementDefs(className);
+      const dashRow = document.getElementById('dashboardAchievementsRow');
+      if (dashRow) {
+        dashRow.innerHTML = defs.slice(0, 2).map(a => `<div class="col-6">${achievementCardHtml(a)}</div>`).join('');
+      }
+      const fullPage = document.getElementById('achievementsGrid');
+      if (fullPage) {
+        fullPage.innerHTML = defs.map(a => `<div class="col-md-4 col-6">${achievementCardHtml(a)}</div>`).join('');
+      }
+    }
+
+    /* ---- Real stats, computed from actual chapter/test counts ---- */
+    function getClassStats(className) {
+      const data = classDatasets[className];
+      let totalCh = 0, doneCh = 0;
+      data.subjects.forEach(s => { totalCh += s.chaptersTotal; doneCh += s.chaptersDone; });
+      const overallPct = totalCh ? Math.round((doneCh / totalCh) * 100) : 0;
+      return { totalCh, doneCh, overallPct, testsTotal: data.testsTotal, testsAttempted: data.testsAttempted };
+    }
+
+    function ensureBaseline(className) {
+      if (sessionBaseline[className]) return;
+      const st = getClassStats(className);
+      sessionBaseline[className] = { overallPct: st.overallPct, doneCh: st.doneCh, testsAttempted: st.testsAttempted, notes: stickyNotes.length };
+    }
+
+    const continueBannerSubjects = ["Mathematics", "Physics", "Chemistry", "English"];
+
+    function renderContinueBanners(className) {
+      const subjects = classDatasets[className].subjects;
+      continueBannerSubjects.forEach(subName => {
+        const card = document.getElementById(`contCard${subName}`);
+        const progEl = document.getElementById(`contProg${subName}`);
+        if (!card || !progEl) return;
+        const sub = subjects.find(s => s.name === subName);
+        if (sub) {
+          const pct = Math.round((sub.chaptersDone / sub.chaptersTotal) * 100);
+          progEl.innerText = `${pct}% Completed`;
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function renderStatsForClass(className) {
+      ensureBaseline(className);
+      const st = getClassStats(className);
+      const base = sessionBaseline[className];
+
+      document.getElementById('statOverall').innerText = st.overallPct + '%';
+      document.getElementById('bigChartVal').innerText = st.overallPct + '%';
+      document.getElementById('statChapters').innerText = st.doneCh;
+      document.getElementById('statTests').innerText = st.testsAttempted;
+      document.getElementById('overviewChapters').innerText = `${st.doneCh}/${st.totalCh}`;
+      document.getElementById('overviewTests').innerText = `${st.testsAttempted}/${st.testsTotal}`;
+      document.getElementById('statNotesCount').innerText = stickyNotes.length;
+
+      document.getElementById('circleChartSmall').style.background =
+        `conic-gradient(#8b5cf6 0% ${st.overallPct}%, rgba(255,255,255,0.1) ${st.overallPct}% 100%)`;
+      document.getElementById('circleChartBig').style.background =
+        `conic-gradient(#6366f1 0% ${st.overallPct}%, rgba(255,255,255,0.08) ${st.overallPct}% 100%)`;
+
+      document.getElementById('overallDelta').innerText = `${Math.max(0, st.overallPct - base.overallPct)}%`;
+      document.getElementById('chaptersDelta').innerText = `${Math.max(0, st.doneCh - base.doneCh)} new`;
+      document.getElementById('testsDelta').innerText = `${Math.max(0, st.testsAttempted - base.testsAttempted)} more`;
+      document.getElementById('notesDelta').innerText = `${Math.max(0, stickyNotes.length - base.notes)} new`;
+
+      renderSubjectsGrid(classDatasets[className].subjects);
+      renderContinueBanners(className);
+      saveProgress();
+    }
+
+    function switchClass(className) {
+      currentSelectedClass = className;
+      const data = classDatasets[className];
+
+      document.getElementById('topUserClass').innerHTML = `${className} <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.6rem;"></i>`;
+      document.getElementById('heroClassBadge').innerHTML = `<i class="fa-solid fa-graduation-cap me-1"></i> ${className}`;
+      document.getElementById('subjectsHeaderTitle').innerText = `My Subjects (${className})`;
+
+      document.getElementById('testTitle').innerText = data.testTitle;
+      document.getElementById('modalTestTitle').innerText = data.testTitle;
+
+      document.querySelectorAll('.submenu-item').forEach(item => {
+        if(item.innerText.includes(className)) {
+          item.classList.add('active-class');
+        } else {
+          item.classList.remove('active-class');
+        }
+      });
+
+      renderStatsForClass(className);
+      renderUpcomingTest(className);
+      renderAchievements(className);
+      showSection('dashboard');
+    }
+
+    function renderSubjectsGrid(subjects) {
+      const grid = document.getElementById('subjectsGrid');
+      grid.innerHTML = '';
+
+      subjects.forEach(sub => {
+        const pct = Math.round((sub.chaptersDone / sub.chaptersTotal) * 100);
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-xl-3 subject-card-item';
+        col.setAttribute('data-name', sub.name);
+        col.style.cursor = 'pointer';
+        col.onclick = () => openBookViewer(sub.name);
+
+        col.innerHTML = `
+          <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="rounded-3 p-2 text-white" style="background: ${sub.color};"><i class="fa-solid ${sub.icon}"></i></div>
+              <span class="badge bg-white bg-opacity-10 text-white border border-white border-opacity-10">Read PDF</span>
+            </div>
+            <h6 class="fw-bold mb-0">${sub.name}</h6>
+            <small class="text-muted d-block mb-2">${sub.chaptersDone}/${sub.chaptersTotal} Chapters</small>
+            <div class="d-flex align-items-center justify-content-between small">
+              <span class="text-muted">${pct}%</span>
+            </div>
+            <div class="progress mt-1" style="height: 5px; background: rgba(255,255,255,0.1);">
+              <div class="progress-bar" style="width: ${pct}%; background: ${sub.color};"></div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(col);
+      });
+    }
+
+    function showSection(sectionKey) {
+      /* FIX: highlight stays only on "Dashboard" before, since no other sidebar
+         button ever received the .active class on click. This keeps whichever
+         section is currently open highlighted in the sidebar, no matter
+         whether it was opened from the sidebar itself or from a dashboard
+         card / quick-access icon. */
+      document.querySelectorAll('#sidebarNav .nav-item-link').forEach(link => link.classList.remove('active'));
+      const activeLink = document.querySelector(`#sidebarNav .nav-item-link[data-section="${sectionKey}"]`);
+      if (activeLink) activeLink.classList.add('active');
+
+      document.getElementById('dashboardSection').style.display = 'none';
+      document.getElementById('genericSection').style.display = 'none';
+      document.getElementById('bookViewerSection').style.display = 'none';
+      document.getElementById('profileSection').style.display = 'none';
+
+      if(sectionKey === 'dashboard') {
+        document.getElementById('dashboardSection').style.display = 'block';
+        return;
+      }
+
+      if(sectionKey === 'profile' || sectionKey === 'settings') {
+        document.getElementById('profileSection').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('genericSection').style.display = 'block';
+      document.getElementById('genericClassBadge').innerText = currentSelectedClass;
+
+      const titleEl = document.getElementById('genericSectionTitle');
+      const bodyEl = document.getElementById('genericSectionBody');
+
+      if(sectionKey === 'notifications') {
+        renderNotificationsPage();
+        return;
+      }
+
+      if(sectionKey === 'subjects') {
+        titleEl.innerHTML = `<i class="fa-solid fa-book-open me-2 text-primary"></i> All Subjects`;
+        let html = `<div class="row g-3">`;
+        classDatasets[currentSelectedClass].subjects.forEach(sub => {
+          const pct = Math.round((sub.chaptersDone / sub.chaptersTotal) * 100);
+          html += `
+            <div class="col-md-4 col-lg-3" style="cursor:pointer;" onclick="openBookViewer('${sub.name}')">
+              <div class="glass-card p-3 text-center">
+                <div class="rounded-circle p-3 mx-auto mb-2 text-white" style="background: ${sub.color}; width:60px; height:60px; display:flex; align-items:center; justify-content:center;">
+                  <i class="fa-solid ${sub.icon} fs-4"></i>
+                </div>
+                <h5 class="fw-bold mb-1">${sub.name}</h5>
+                <small class="text-muted d-block mb-2">${sub.chaptersDone}/${sub.chaptersTotal} Chapters • ${pct}% Complete</small>
+                <button class="btn btn-gradient-sm w-100"><i class="fa-solid fa-file-pdf me-1"></i> Open Book Notes</button>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+        bodyEl.innerHTML = html;
+      } 
+      else if(sectionKey === 'chapters') {
+        const cst = getClassStats(currentSelectedClass);
+        titleEl.innerHTML = `<i class="fa-solid fa-book me-2 text-info"></i> Chapters & Lessons`;
+        let html = `<p class="text-muted small mb-3">You've completed <b class="text-white">${cst.doneCh}/${cst.totalCh}</b> chapters overall (${cst.overallPct}%) — this only moves when you actually attempt a test, never by just clicking a button.</p>`;
+        html += `<div class="row g-3">`;
+        classDatasets[currentSelectedClass].subjects.forEach(sub => {
+          const pct = Math.round((sub.chaptersDone / sub.chaptersTotal) * 100);
+          html += `
+            <div class="col-md-6 col-lg-4">
+              <div class="glass-card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="fw-bold mb-0">${sub.name}</h6>
+                  <span class="small text-muted">${sub.chaptersDone}/${sub.chaptersTotal}</span>
+                </div>
+                <div class="progress mb-2" style="height: 5px; background: rgba(255,255,255,0.1);">
+                  <div class="progress-bar" style="width: ${pct}%; background: ${sub.color};"></div>
+                </div>
+                <button class="btn btn-gradient-sm btn-sm" onclick="openBookViewer('${sub.name}')">Read Notes →</button>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+        bodyEl.innerHTML = html;
+      }
+      else if(sectionKey === 'tests') {
+        const data = classDatasets[currentSelectedClass];
+        titleEl.innerHTML = `<i class="fa-solid fa-clipboard-check me-2 text-success"></i> Online Tests & MCQs`;
+        bodyEl.innerHTML = `
+          <p class="text-muted small mb-3">You've attempted <b class="text-white">${data.testsAttempted}/${data.testsTotal}</b> tests so far — this only goes up when you actually take one.</p>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="glass-card p-3">
+                <h6 class="fw-bold mb-1">${data.testTitle}</h6>
+                <p class="text-muted small mb-2">MCQs • Short & Long Questions</p>
+                <small class="text-muted d-block mb-2"><i class="fa-regular fa-calendar me-1"></i> ${formatTestSchedule(data.testDateTime)}</small>
+                <button class="btn btn-gradient-sm" id="testsPageAttemptBtn" onclick="handleStartTestClick()" ${data.testsAttempted >= data.testsTotal ? 'disabled' : ''}>${isTestUnlocked(currentSelectedClass) ? 'Attempt Now' : '<i class="fa-solid fa-lock me-1"></i> Locked'}</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      else if(sectionKey === 'progress') {
+        const cst = getClassStats(currentSelectedClass);
+        const data = classDatasets[currentSelectedClass];
+        titleEl.innerHTML = `<i class="fa-solid fa-chart-line me-2 text-primary"></i> Progress Overview`;
+        let html = `
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="glass-card p-3 text-center">
+                <h3 class="fw-bold mb-0">${cst.overallPct}%</h3>
+                <small class="text-muted">Overall Progress</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass-card p-3 text-center">
+                <h3 class="fw-bold mb-0">${cst.doneCh}/${cst.totalCh}</h3>
+                <small class="text-muted">Chapters Completed</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass-card p-3 text-center">
+                <h3 class="fw-bold mb-0">${data.testsAttempted}/${data.testsTotal}</h3>
+                <small class="text-muted">Tests Attempted</small>
+              </div>
+            </div>
+          </div>
+          <div class="row g-3">
+        `;
+        classDatasets[currentSelectedClass].subjects.forEach(sub => {
+          const pct = Math.round((sub.chaptersDone / sub.chaptersTotal) * 100);
+          html += `
+            <div class="col-md-6">
+              <div class="glass-card p-3">
+                <div class="d-flex justify-content-between mb-2">
+                  <h6 class="fw-bold mb-0">${sub.name}</h6>
+                  <span class="small text-muted">${pct}%</span>
+                </div>
+                <div class="progress" style="height: 6px; background: rgba(255,255,255,0.1);">
+                  <div class="progress-bar" style="width: ${pct}%; background: ${sub.color};"></div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+        bodyEl.innerHTML = html;
+      }
+      else if(sectionKey === 'achievements') {
+        titleEl.innerHTML = `<i class="fa-solid fa-trophy me-2 text-warning"></i> Achievements`;
+        bodyEl.innerHTML = `
+          <p class="text-muted small mb-3">Every badge below unlocks automatically the moment you actually earn it — nothing here is pre-marked as done.</p>
+          <div class="row g-3" id="achievementsGrid"></div>
+        `;
+        renderAchievements(currentSelectedClass);
+      }
+      else if(sectionKey === 'bookmarks') {
+        titleEl.innerHTML = `<i class="fa-solid fa-bookmark me-2 text-danger"></i> Bookmarks`;
+        bodyEl.innerHTML = `
+          <p class="text-muted small mb-3">Every card below is a real page you bookmarked while reading — tap "Resume" to jump straight back to that exact chapter and page.</p>
+          <div class="row g-3" id="bookmarksList"></div>
+        `;
+        renderBookmarksList();
+      }
+      else if(sectionKey === 'stickynotes') {
+        titleEl.innerHTML = `<i class="fa-solid fa-note-sticky me-2 text-warning"></i> Sticky Notes`;
+        bodyEl.innerHTML = `
+          <div class="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <p class="text-muted small mb-0">Pick a color, choose your text color and font size, add a heading, and even drop in a diagram — all saved for real.</p>
+            <button class="btn btn-gradient-sm" onclick="openAddStickyNoteModal()"><i class="fa-solid fa-plus me-1"></i> Add Note</button>
+          </div>
+          <div class="row g-3" id="stickyNotesList"></div>
+        `;
+        renderStickyNotesList();
+      }
+      else {
+        titleEl.innerText = sectionKey.toUpperCase();
+        bodyEl.innerHTML = `<div class="text-center py-5"><i class="fa-solid fa-folder-open text-primary display-4 mb-3"></i><h5>Welcome to ${sectionKey} Section</h5></div>`;
+      }
+    }
+
+    /* ============================================================
+       REAL STICKY NOTES
+       Every note is a real object the student built in the composer
+       modal: heading, text, a chosen color, a chosen text color, a
+       chosen font size, and an optional uploaded diagram/image.
+       Nothing here is placeholder — add/edit/delete all persist for
+       real via saveProgress(), the same store used for chapters/tests.
+       ============================================================ */
+    function escapeHtml(str) {
+      return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    const stickyColorMap = {
+      red:    'linear-gradient(135deg, #fecaca 0%, #ef4444 100%)',
+      blue:   'linear-gradient(135deg, #bfdbfe 0%, #3b82f6 100%)',
+      yellow: 'linear-gradient(135deg, #fef08a 0%, #f59e0b 100%)',
+      green:  'linear-gradient(135deg, #bbf7d0 0%, #22c55e 100%)',
+      purple: 'linear-gradient(135deg, #e9d5ff 0%, #a855f7 100%)',
+      parrot: 'linear-gradient(135deg, #ecfccb 0%, #84cc16 100%)'
+    };
+
+    let stickyNoteDraft = { color: 'yellow', textColor: 'black', fontSize: 16, image: null };
+    let stickyNoteEditId = null;
+
+    function renderStickyNotesList() {
+      const container = document.getElementById('stickyNotesList');
+      if (!container) return;
+      if (stickyNotes.length === 0) {
+        container.innerHTML = `<div class="col-12 text-center text-muted py-5"><i class="fa-solid fa-note-sticky display-5 mb-3 d-block opacity-50"></i>No sticky notes yet — click "Add Note" to create your first one!</div>`;
+        return;
+      }
+      container.innerHTML = stickyNotes.slice().reverse().map(note => stickyNoteCardHtml(note, true)).join('');
+    }
+
+    function stickyNoteCardHtml(note, withActions) {
+      const bg = stickyColorMap[note.color] || stickyColorMap.yellow;
+      const txt = note.textColor === 'white' ? '#ffffff' : '#1a1a1a';
+      const fs = note.fontSize || 16;
+      return `
+        <div class="col-md-4 col-lg-3">
+          <div class="sticky-note-card" style="background:${bg}; color:${txt};">
+            <div class="sticky-note-pin"></div>
+            ${note.heading ? `<div class="sticky-note-heading" style="font-size:${fs + 3}px; color:${txt};">${escapeHtml(note.heading)}</div>` : ''}
+            ${note.image ? `<img src="${note.image}" class="sticky-note-image" alt="Note diagram">` : ''}
+            <p class="sticky-note-text mb-0" style="font-size:${fs}px; color:${txt};">${escapeHtml(note.text)}</p>
+            <div class="sticky-note-footer" style="border-top-color:${note.textColor === 'white' ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.14)'};">
+              <small style="font-size:0.65rem; color:${txt}; opacity:0.8;">${note.date}</small>
+              ${withActions ? `
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm" style="color:${txt};" onclick="viewStickyNote('${note.id}')" title="View note"><i class="fa-solid fa-eye"></i></button>
+                  <button class="btn btn-sm" style="color:${txt};" onclick="openEditStickyNoteModal('${note.id}')" title="Edit note"><i class="fa-solid fa-pen"></i></button>
+                  <button class="btn btn-sm" style="color:${txt};" onclick="deleteStickyNoteById('${note.id}')" title="Delete note"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function viewStickyNote(id) {
+      const note = stickyNotes.find(n => n.id === id);
+      if (!note) return;
+      const bg = stickyColorMap[note.color] || stickyColorMap.yellow;
+      const txt = note.textColor === 'white' ? '#ffffff' : '#1a1a1a';
+      const fs = note.fontSize || 16;
+      document.getElementById('viewStickyNoteBody').innerHTML = `
+        <div class="sticky-note-card" style="background:${bg}; color:${txt}; min-height:auto; transform:none !important; box-shadow:none;">
+          <div class="sticky-note-pin"></div>
+          ${note.heading ? `<div class="sticky-note-heading" style="font-size:${fs + 8}px; color:${txt};">${escapeHtml(note.heading)}</div>` : ''}
+          ${note.image ? `<img src="${note.image}" class="sticky-note-image" style="max-height:320px; object-fit:contain; background:rgba(255,255,255,0.15);" alt="Note diagram">` : ''}
+          <p class="sticky-note-text mb-0" style="font-size:${fs + 2}px; color:${txt};">${escapeHtml(note.text)}</p>
+          <div class="sticky-note-footer" style="border-top-color:${note.textColor === 'white' ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.14)'};">
+            <small style="font-size:0.75rem; color:${txt}; opacity:0.8;">${note.date}</small>
+          </div>
+        </div>
+      `;
+      const editBtn = document.getElementById('viewStickyNoteEditBtn');
+      editBtn.onclick = () => {
+        bootstrap.Modal.getInstance(document.getElementById('viewStickyNoteModal')).hide();
+        openEditStickyNoteModal(id);
+      };
+      new bootstrap.Modal(document.getElementById('viewStickyNoteModal')).show();
+    }
+
+    function updateStickyColorSwatchUI() {
+      document.querySelectorAll('.sticky-color-swatch').forEach(el => {
+        el.classList.toggle('active-swatch', el.getAttribute('data-color') === stickyNoteDraft.color);
+      });
+    }
+
+    function selectStickyColor(color) {
+      stickyNoteDraft.color = color;
+      updateStickyColorSwatchUI();
+      updateStickyPreview();
+    }
+
+    function handleStickyImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        stickyNoteDraft.image = e.target.result;
+        const wrap = document.getElementById('stickyImagePreviewWrap');
+        const img = document.getElementById('stickyImagePreview');
+        if (img) img.src = stickyNoteDraft.image;
+        if (wrap) wrap.style.display = 'flex';
+        updateStickyPreview();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeStickyImage() {
+      stickyNoteDraft.image = null;
+      const wrap = document.getElementById('stickyImagePreviewWrap');
+      const fileInput = document.getElementById('stickyImageInput');
+      if (wrap) wrap.style.display = 'none';
+      if (fileInput) fileInput.value = '';
+      updateStickyPreview();
+    }
+
+    function updateStickyPreview() {
+      const previewEl = document.getElementById('stickyNoteLivePreview');
+      if (!previewEl) return;
+      const heading = document.getElementById('stickyNoteHeadingInput').value.trim();
+      const text = document.getElementById('stickyNoteTextInput').value.trim() || 'Your note text will appear here...';
+      stickyNoteDraft.textColor = document.getElementById('stickyTextColorSelect').value;
+      stickyNoteDraft.fontSize = parseInt(document.getElementById('stickyFontSizeSelect').value, 10);
+      previewEl.innerHTML = stickyNoteCardHtml({
+        heading, text,
+        color: stickyNoteDraft.color,
+        textColor: stickyNoteDraft.textColor,
+        fontSize: stickyNoteDraft.fontSize,
+        image: stickyNoteDraft.image,
+        date: 'Preview'
+      }, false);
+    }
+
+    function resetStickyNoteModalFields() {
+      stickyNoteDraft = { color: 'yellow', textColor: 'black', fontSize: 16, image: null };
+      stickyNoteEditId = null;
+      document.getElementById('stickyNoteHeadingInput').value = '';
+      document.getElementById('stickyNoteTextInput').value = '';
+      document.getElementById('stickyTextColorSelect').value = 'black';
+      document.getElementById('stickyFontSizeSelect').value = '16';
+      document.getElementById('stickyImagePreviewWrap').style.display = 'none';
+      document.getElementById('stickyImageInput').value = '';
+      updateStickyColorSwatchUI();
+      updateStickyPreview();
+    }
+
+    function openAddStickyNoteModal() {
+      resetStickyNoteModalFields();
+      document.getElementById('stickyNoteModalTitle').innerHTML = `<i class="fa-solid fa-note-sticky me-2 text-warning"></i> New Sticky Note`;
+      new bootstrap.Modal(document.getElementById('stickyNoteModal')).show();
+    }
+
+    function openEditStickyNoteModal(id) {
+      const note = stickyNotes.find(n => n.id === id);
+      if (!note) return;
+      resetStickyNoteModalFields();
+      stickyNoteEditId = id;
+      stickyNoteDraft = { color: note.color, textColor: note.textColor, fontSize: note.fontSize, image: note.image || null };
+      document.getElementById('stickyNoteHeadingInput').value = note.heading || '';
+      document.getElementById('stickyNoteTextInput').value = note.text || '';
+      document.getElementById('stickyTextColorSelect').value = note.textColor;
+      document.getElementById('stickyFontSizeSelect').value = String(note.fontSize);
+      if (note.image) {
+        document.getElementById('stickyImagePreview').src = note.image;
+        document.getElementById('stickyImagePreviewWrap').style.display = 'flex';
+      }
+      document.getElementById('stickyNoteModalTitle').innerHTML = `<i class="fa-solid fa-pen me-2 text-warning"></i> Edit Sticky Note`;
+      updateStickyColorSwatchUI();
+      updateStickyPreview();
+      new bootstrap.Modal(document.getElementById('stickyNoteModal')).show();
+    }
+
+    function saveStickyNoteFromModal() {
+      const heading = document.getElementById('stickyNoteHeadingInput').value.trim();
+      const text = document.getElementById('stickyNoteTextInput').value.trim();
+      if (!text) {
+        alert('Please write something in the note before saving.');
+        return;
+      }
+      stickyNoteDraft.textColor = document.getElementById('stickyTextColorSelect').value;
+      stickyNoteDraft.fontSize = parseInt(document.getElementById('stickyFontSizeSelect').value, 10);
+
+      if (stickyNoteEditId) {
+        const note = stickyNotes.find(n => n.id === stickyNoteEditId);
+        if (note) {
+          note.heading = heading;
+          note.text = text;
+          note.color = stickyNoteDraft.color;
+          note.textColor = stickyNoteDraft.textColor;
+          note.fontSize = stickyNoteDraft.fontSize;
+          note.image = stickyNoteDraft.image;
+        }
+      } else {
+        stickyNotes.push({
+          id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          heading, text,
+          color: stickyNoteDraft.color,
+          textColor: stickyNoteDraft.textColor,
+          fontSize: stickyNoteDraft.fontSize,
+          image: stickyNoteDraft.image,
+          date: new Date().toLocaleDateString(),
+          ts: Date.now()
+        });
+      }
+
+      bootstrap.Modal.getInstance(document.getElementById('stickyNoteModal')).hide();
+      renderStickyNotesList();
+      renderStatsForClass(currentSelectedClass);
+    }
+
+    function deleteStickyNoteById(id) {
+      if (!confirm('Delete this sticky note?')) return;
+      stickyNotes = stickyNotes.filter(n => n.id !== id);
+      renderStickyNotesList();
+      renderStatsForClass(currentSelectedClass);
+    }
+
+    /* ---- Book Viewer: chapter list length now matches the subject's REAL
+       total chapter count, and each chapter shows a real done/undone check
+       mark driven by that subject's chaptersDone. ---- */
+    let currentBookSubjectName = null;
+    let currentChapterIndex = 0;
+
+    const chapterTitleBank = [
+      "Introduction & Overview",
+      "Fundamental Concepts",
+      "Key Formulas & Theorems",
+      "Solved Exercises",
+      "Practice MCQs & Past Papers"
+    ];
+
+    function openBookViewer(subjectName) {
+      document.getElementById('dashboardSection').style.display = 'none';
+      document.getElementById('genericSection').style.display = 'none';
+      document.getElementById('profileSection').style.display = 'none';
+      document.getElementById('bookViewerSection').style.display = 'block';
+
+      currentBookSubjectName = subjectName;
+      const sub = classDatasets[currentSelectedClass].subjects.find(s => s.name === subjectName);
+      const total = sub ? sub.chaptersTotal : 5;
+
+      document.getElementById('bookSubjectTitle').innerText = `${subjectName} Book Notes`;
+      document.getElementById('bookClassSub').innerText = `${currentSelectedClass} • Interactive PDF Book Reader`;
+
+      const listContainer = document.getElementById('bookChaptersList');
+      listContainer.innerHTML = '';
+
+      for (let index = 0; index < total; index++) {
+        const chapterTitle = `Chapter ${index + 1}: ${chapterTitleBank[index % chapterTitleBank.length]}`;
+        const isDone = sub && index < sub.chaptersDone;
+        const item = document.createElement('a');
+        item.className = `list-group-item bg-transparent text-white border-white border-opacity-10 py-3 d-flex justify-content-between align-items-center ${index === 0 ? 'fw-bold text-primary' : ''}`;
+        item.style.cursor = 'pointer';
+        item.innerHTML = `
+          <span><i class="fa-regular fa-file-pdf me-2 text-danger"></i> ${chapterTitle}</span>
+          <i class="fa-solid fa-circle-check ${isDone ? 'text-success' : 'text-muted opacity-25'}"></i>
+        `;
+        item.onclick = () => selectChapter(index, chapterTitle);
+        listContainer.appendChild(item);
+      }
+
+      /* Opening the book itself is a real, loggable activity — logged once
+         here; the very first chapter it auto-selects is opened "silently"
+         right after so it doesn't also log a duplicate entry. */
+      logActivity('chapter', `Opened "${subjectName}" book`);
+      selectChapter(0, `Chapter 1: ${chapterTitleBank[0]}`, { silent: true });
+      updateBookProgressUI();
+    }
+
+    /* ---- Real per-page reading state + real bookmarking.
+       Every chapter has its own real page count (it genuinely changes
+       what "Page X of Y" shows and what Prev/Next can reach), and every
+       single page — in every chapter, in every subject — can be bookmarked
+       for real. Nothing here is a static/fake label. ---- */
+    let currentChapterTitle = '';
+    let currentChapterTotalPages = 1;
+    let currentPage = 1;
+
+    function getChapterTotalPages(index) {
+      return Math.min(48, 12 + index * 4);
+    }
+
+    function selectChapter(index, title, opts) {
+      opts = opts || {};
+      currentChapterIndex = index;
+      currentChapterTitle = title;
+      currentChapterTotalPages = getChapterTotalPages(index);
+      currentPage = 1;
+
+      const items = document.querySelectorAll('#bookChaptersList a');
+      items.forEach(el => el.classList.remove('fw-bold', 'text-primary'));
+      if (items[index]) items[index].classList.add('fw-bold', 'text-primary');
+      document.getElementById('currentReadingChapter').innerHTML = `<i class="fa-solid fa-book-open me-2"></i> Reading: ${title}`;
+
+      updatePageIndicatorUI();
+      updateBookmarkButtonUI();
+
+      if (!opts.silent) {
+        logActivity('chapter', `Started reading "${title}" • ${currentBookSubjectName}`);
+      }
+    }
+
+    function goToPrevPage() {
+      if (currentPage <= 1) return;
+      currentPage--;
+      updatePageIndicatorUI();
+      updateBookmarkButtonUI();
+    }
+
+    function goToNextPage() {
+      if (currentPage >= currentChapterTotalPages) return;
+      currentPage++;
+      updatePageIndicatorUI();
+      updateBookmarkButtonUI();
+    }
+
+    function updatePageIndicatorUI() {
+      const indicator = document.getElementById('bookPageIndicator');
+      const prevBtn = document.getElementById('prevPageBtn');
+      const nextBtn = document.getElementById('nextPageBtn');
+      if (indicator) indicator.innerText = `Page ${currentPage} of ${currentChapterTotalPages}`;
+      if (prevBtn) prevBtn.disabled = currentPage <= 1;
+      if (nextBtn) nextBtn.disabled = currentPage >= currentChapterTotalPages;
+    }
+
+    /* ---- Real bookmarks: persisted in their own localStorage store,
+       keyed on the exact class + subject + chapter + page combination
+       so every page, in every chapter, can be bookmarked independently. ---- */
+    let bookmarks = [];
+
+    function saveBookmarks() {
+      try { localStorage.setItem('studymate_bookmarks_v1', JSON.stringify(bookmarks)); } catch (e) { /* storage unavailable */ }
+    }
+
+    function loadBookmarks() {
+      try {
+        const raw = localStorage.getItem('studymate_bookmarks_v1');
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) bookmarks = arr;
+        }
+      } catch (e) { bookmarks = []; }
+    }
+
+    function currentBookmarkKey() {
+      return `${currentSelectedClass}|${currentBookSubjectName}|${currentChapterIndex}|${currentPage}`;
+    }
+
+    function isCurrentPageBookmarked() {
+      return bookmarks.some(b => b.key === currentBookmarkKey());
+    }
+
+    function updateBookmarkButtonUI() {
+      const btn = document.getElementById('bookmarkPageBtn');
+      if (!btn) return;
+      const active = isCurrentPageBookmarked();
+      btn.classList.toggle('is-bookmarked', active);
+      btn.innerHTML = active
+        ? '<i class="fa-solid fa-bookmark me-1"></i> Bookmarked'
+        : '<i class="fa-regular fa-bookmark me-1"></i> Bookmark';
+    }
+
+    function toggleBookmarkCurrentPage() {
+      const key = currentBookmarkKey();
+      const idx = bookmarks.findIndex(b => b.key === key);
+
+      if (idx >= 0) {
+        bookmarks.splice(idx, 1);
+        saveBookmarks();
+        updateBookmarkButtonUI();
+        renderBookmarksListIfOpen();
+        return;
+      }
+
+      bookmarks.unshift({
+        id: 'bm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        key,
+        className: currentSelectedClass,
+        subject: currentBookSubjectName,
+        chapterIndex: currentChapterIndex,
+        chapterTitle: currentChapterTitle,
+        page: currentPage,
+        totalPages: currentChapterTotalPages,
+        date: new Date().toLocaleDateString(),
+        ts: Date.now()
+      });
+      saveBookmarks();
+      updateBookmarkButtonUI();
+      renderBookmarksListIfOpen();
+      logActivity('chapter', `Bookmarked page ${currentPage} of "${currentChapterTitle}" • ${currentBookSubjectName}`);
+    }
+
+    function renderBookmarksListIfOpen() {
+      if (document.getElementById('bookmarksList')) renderBookmarksList();
+    }
+
+    function renderBookmarksList() {
+      const container = document.getElementById('bookmarksList');
+      if (!container) return;
+      const classBookmarks = bookmarks.filter(b => b.className === currentSelectedClass).sort((a, b) => b.ts - a.ts);
+
+      if (!classBookmarks.length) {
+        container.innerHTML = `<div class="col-12 text-center text-muted py-5"><i class="fa-solid fa-bookmark display-5 mb-3 d-block opacity-50"></i>No bookmarks yet for ${escapeHtml(currentSelectedClass)} — open a book and tap the Bookmark button on any page to save it here.</div>`;
+        return;
+      }
+
+      container.innerHTML = classBookmarks.map(b => `
+        <div class="col-md-6 col-lg-4">
+          <div class="glass-card p-3 h-100 d-flex flex-column justify-content-between">
+            <div>
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="badge bg-purple text-purple bookmark-card-subject-badge">${escapeHtml(b.subject)}</span>
+                <small class="text-muted" style="font-size:0.65rem;">${b.date}</small>
+              </div>
+              <h6 class="fw-bold mb-1">${escapeHtml(b.chapterTitle)}</h6>
+              <small class="text-muted d-block mb-3"><i class="fa-regular fa-file-pdf me-1"></i> Page ${b.page} of ${b.totalPages}</small>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-gradient-sm btn-sm flex-grow-1" onclick="jumpToBookmark('${b.id}')"><i class="fa-solid fa-book-open me-1"></i> Resume</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="removeBookmarkById('${b.id}')" title="Remove bookmark"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function removeBookmarkById(id) {
+      bookmarks = bookmarks.filter(b => b.id !== id);
+      saveBookmarks();
+      renderBookmarksList();
+      updateBookmarkButtonUI();
+    }
+
+    function jumpToBookmark(id) {
+      const b = bookmarks.find(x => x.id === id);
+      if (!b) return;
+      if (b.className !== currentSelectedClass) switchClass(b.className);
+
+      openBookViewer(b.subject);
+      const chapterTitle = `Chapter ${b.chapterIndex + 1}: ${chapterTitleBank[b.chapterIndex % chapterTitleBank.length]}`;
+      selectChapter(b.chapterIndex, chapterTitle, { silent: true });
+      currentPage = Math.min(b.page, currentChapterTotalPages);
+      updatePageIndicatorUI();
+      updateBookmarkButtonUI();
+    }
+
+    function updateBookProgressUI() {
+      const sub = classDatasets[currentSelectedClass].subjects.find(s => s.name === currentBookSubjectName);
+      const el = document.getElementById('bookProgressSummary');
+      if (el && sub) {
+        const pct = Math.round((sub.chaptersDone / sub.chaptersTotal) * 100);
+        el.innerText = `${sub.chaptersDone}/${sub.chaptersTotal} chapters completed • ${pct}%`;
+      }
+    }
+
+    /* NOTE: there is intentionally no manual "Mark as Complete" button here —
+       letting a student tap a button to instantly mark any chapter done would
+       make chaptersDone meaningless (everyone would just complete everything).
+       chaptersDone only ever moves for real, verifiable reasons: attempting an
+       actual test in the Test Modal (see submitCurrentTest / logActivity). */
+
+    /* TRIGGER PHOTO UPLOAD FILE INPUT */
+    function triggerPhotoUpload() {
+      document.getElementById('galleryUploadInput').click();
+    }
+
+    /* HANDLE GALLERY UPLOAD & LIVE UPDATE */
+    function handleGalleryUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imgUrl = e.target.result;
+          const previewImg = document.getElementById('profilePreviewImg');
+          const placeholder = document.getElementById('uploadPlaceholder');
+
+          previewImg.src = imgUrl;
+          previewImg.style.display = 'block';
+          placeholder.style.display = 'none';
+
+          document.getElementById('topHeaderUserAvatar').src = imgUrl;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    /* VIEW PHOTO FULL SIZE MODAL */
+    function viewPhotoModal() {
+      const currentSrc = document.getElementById('profilePreviewImg').src;
+      if (!currentSrc || document.getElementById('profilePreviewImg').style.display === 'none') {
+        alert('No profile photo uploaded to view!');
+        return;
+      }
+      document.getElementById('fullPhotoModalImg').src = currentSrc;
+      new bootstrap.Modal(document.getElementById('viewPhotoModal')).show();
+    }
+
+    /* CROP / ADJUST PHOTO — REAL CROPPER.JS TOOL */
+    let activeCropper = null;
+
+    function cropPhotoAction() {
+      const previewImg = document.getElementById('profilePreviewImg');
+      if (previewImg.style.display === 'none' || !previewImg.src) {
+        alert('Please upload a photo first to crop/adjust!');
+        return;
+      }
+      const cropperImg = document.getElementById('cropperSourceImage');
+      cropperImg.src = previewImg.src;
+
+      const modalEl = document.getElementById('cropPhotoModal');
+      const cropModal = new bootstrap.Modal(modalEl);
+      cropModal.show();
+
+      modalEl.addEventListener('shown.bs.modal', function initCropperOnce() {
+        destroyCropper();
+        activeCropper = new Cropper(cropperImg, {
+          aspectRatio: 1,
+          viewMode: 1,
+          dragMode: 'move',
+          background: false,
+          autoCropArea: 0.9,
+          responsive: true,
+        });
+        modalEl.removeEventListener('shown.bs.modal', initCropperOnce);
+      });
+    }
+
+    function destroyCropper() {
+      if (activeCropper) {
+        activeCropper.destroy();
+        activeCropper = null;
+      }
+    }
+
+    function cropperZoom(value) {
+      if (activeCropper) activeCropper.zoomTo(1 + parseFloat(value));
+    }
+
+    function cropperRotate(deg) {
+      if (activeCropper) activeCropper.rotate(deg);
+    }
+
+    function cropperReset() {
+      if (activeCropper) activeCropper.reset();
+      document.getElementById('cropZoomRange').value = 0;
+    }
+
+    function applyCroppedPhoto() {
+      if (!activeCropper) return;
+      const canvas = activeCropper.getCroppedCanvas({ width: 400, height: 400 });
+      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+      const previewImg = document.getElementById('profilePreviewImg');
+      const placeholder = document.getElementById('uploadPlaceholder');
+      previewImg.src = croppedUrl;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      document.getElementById('topHeaderUserAvatar').src = croppedUrl;
+
+      destroyCropper();
+      bootstrap.Modal.getInstance(document.getElementById('cropPhotoModal')).hide();
+    }
+
+    /* REMOVE PHOTO ACTION */
+    function removePhotoAction() {
+      if (confirm('Are you sure you want to remove your profile photo?')) {
+        const previewImg = document.getElementById('profilePreviewImg');
+        const placeholder = document.getElementById('uploadPlaceholder');
+
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+        placeholder.style.display = 'block';
+
+        document.getElementById('topHeaderUserAvatar').src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80';
+      }
+    }
+
+    /* SHOW A PROPER UPDATE-SUCCESS POPUP INSTEAD OF A BROWSER ALERT */
+    function showUpdateSuccessModal(message) {
+      document.getElementById('updateSuccessMsg').innerText = message || 'Your profile details were saved successfully.';
+      new bootstrap.Modal(document.getElementById('updateSuccessModal')).show();
+    }
+
+    /* SAVE PROFILE FORM CHANGES */
+    function saveProfileChanges(e) {
+      if(e) e.preventDefault();
+      const name = document.getElementById('profFullName').value;
+      const username = document.getElementById('profUsername').value;
+      const selectedClass = document.getElementById('profClassSelect').value;
+
+      document.getElementById('topHeaderUserName').innerText = name;
+      document.getElementById('dashGreetingName').innerText = name;
+      document.getElementById('profileDisplayName').innerText = name;
+      document.getElementById('profileDisplayTag').innerText = `@${username}`;
+      document.getElementById('profileDisplayClass').innerText = `${selectedClass} Student`;
+
+      switchClass(selectedClass);
+
+      /* Keep the saved account record (used for login) in sync with the
+         profile edits, so the updated name/class are still there next
+         time this user logs in. */
+      const sessionUser = getSessionUser();
+      if (sessionUser) {
+        const users = getUsers();
+        const idx = users.findIndex(u => u.email.toLowerCase() === sessionUser.email.toLowerCase());
+        if (idx !== -1) {
+          users[idx].name = name;
+          users[idx].className = selectedClass;
+          saveUsers(users);
+        }
+      }
+
+      showUpdateSuccessModal('Profile details updated successfully!');
+    }
+
+    /* ============ REAL AUTH: SIGNUP / LOGIN / LOGOUT ============
+       Accounts are stored in localStorage under 'studymate_users_v1' as an
+       array of {name, email, password, className}. The currently logged-in
+       user's email is stored under 'studymate_session_v1'. This means:
+       - Signing up creates a real account and logs you straight in.
+       - Logging out clears the session and sends you back to the login page.
+       - Logging back in with that same email + password restores the session,
+         and simply reloading the page (without logging out) keeps you logged in. ============ */
+    function getUsers() {
+      try { return JSON.parse(localStorage.getItem('studymate_users_v1')) || []; }
+      catch (e) { return []; }
+    }
+    function saveUsers(users) {
+      try { localStorage.setItem('studymate_users_v1', JSON.stringify(users)); } catch (e) { /* ignore */ }
+    }
+    function setSession(email) {
+      try { localStorage.setItem('studymate_session_v1', email); } catch (e) { /* ignore */ }
+    }
+    function clearSession() {
+      try { localStorage.removeItem('studymate_session_v1'); } catch (e) { /* ignore */ }
+    }
+    function getSessionUser() {
+      let email;
+      try { email = localStorage.getItem('studymate_session_v1'); } catch (e) { return null; }
+      if (!email) return null;
+      return getUsers().find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+    }
+
+    function showAuthForm(which) {
+      document.getElementById('loginFormWrap').style.display = which === 'login' ? '' : 'none';
+      document.getElementById('signupFormWrap').style.display = which === 'signup' ? '' : 'none';
+      document.getElementById('loginErrorBox').style.display = 'none';
+      document.getElementById('signupErrorBox').style.display = 'none';
+    }
+
+    function showAuthScreen() {
+      document.getElementById('authScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+
+    /* Populates the profile / header UI with the logged-in user's real
+       details and boots up the dashboard for them. */
+    function enterApp(user) {
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = '';
+
+      const username = user.email.split('@')[0];
+      document.getElementById('topHeaderUserName').innerText = user.name;
+      document.getElementById('dashGreetingName').innerText = user.name.split(' ')[0];
+      document.getElementById('profileDisplayName').innerText = user.name;
+      document.getElementById('profileDisplayTag').innerText = `@${username}`;
+      document.getElementById('profileDisplayClass').innerText = `${user.className} Student`;
+      if (document.getElementById('profFullName')) document.getElementById('profFullName').value = user.name;
+      if (document.getElementById('profUsername')) document.getElementById('profUsername').value = username;
+      if (document.getElementById('profClassSelect')) document.getElementById('profClassSelect').value = user.className;
+      if (document.getElementById('profEmail')) document.getElementById('profEmail').value = user.email;
+
+      loadProgress();
+      loadBookmarks();
+      updateStreak();
+      renderStreakUI();
+      renderRecentActivity();
+      switchClass(user.className);
+      updateNotifBadge();
+    }
+
+    function handleSignup(e) {
+      e.preventDefault();
+      const name = document.getElementById('signupName').value.trim();
+      const className = document.getElementById('signupClass').value;
+      const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupConfirmPassword').value;
+      const errorBox = document.getElementById('signupErrorBox');
+
+      if (password !== confirmPassword) {
+        errorBox.innerText = 'Passwords do not match.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const users = getUsers();
+      if (users.some(u => u.email.toLowerCase() === email)) {
+        errorBox.innerText = 'An account with this email already exists. Please log in instead.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const newUser = { name, email, password, className };
+      users.push(newUser);
+      saveUsers(users);
+      setSession(email);
+      errorBox.style.display = 'none';
+      logActivity('signup', `${name} created an account for ${className}`);
+      enterApp(newUser);
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const password = document.getElementById('loginPassword').value;
+      const errorBox = document.getElementById('loginErrorBox');
+
+      const users = getUsers();
+      const user = users.find(u => u.email.toLowerCase() === email && u.password === password);
+
+      if (!user) {
+        errorBox.innerText = 'Incorrect email or password.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      setSession(user.email);
+      errorBox.style.display = 'none';
+      logActivity('login', `${user.name} logged in`);
+      enterApp(user);
+    }
+
+    function handleLogout() {
+      const currentUser = getSessionUser();
+      if (currentUser) {
+        logActivity('logout', `${currentUser.name} logged out`);
+      }
+      clearSession();
+      document.getElementById('loginForm').reset();
+      document.getElementById('signupForm').reset();
+      showAuthForm('login');
+      showAuthScreen();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const sessionUser = getSessionUser();
+      if (sessionUser) {
+        enterApp(sessionUser);
+      } else {
+        showAuthScreen();
+      }
+
+      const classesBtn = document.getElementById('classesDropdownBtn');
+      const collapseEl = new bootstrap.Collapse(document.getElementById('classesCollapse'), { toggle: false });
+      classesBtn.addEventListener('click', () => collapseEl.toggle());
+
+      const searchInput = document.getElementById('mainSearchInput');
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        document.querySelectorAll('.subject-card-item').forEach(card => {
+          const name = card.getAttribute('data-name').toLowerCase();
+          card.style.display = name.includes(query) ? 'block' : 'none';
+        });
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if((e.ctrlKey || e.metaKey) && e.key === 'k') {
+          e.preventDefault();
+          searchInput.focus();
+        }
+      });
+
+      document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('show');
+      });
+
+      /* FIX: sticky header — add a compact floating background once the
+         page is actually scrolled, remove it again at the top. */
+      const topHeader = document.getElementById('topHeader');
+      window.addEventListener('scroll', () => {
+        topHeader.classList.toggle('header-scrolled', window.scrollY > 10);
+      });
+
+
+      const themeBtn = document.getElementById('themeToggleBtn');
+      const authThemeBtn = document.getElementById('authThemeToggleBtn');
+      let darkTheme = true;
+
+      function applyThemeToggleUI() {
+        const icon = darkTheme ? '<i class="fa-regular fa-moon"></i>' : '<i class="fa-regular fa-sun text-warning"></i>';
+        themeBtn.innerHTML = icon;
+        authThemeBtn.innerHTML = icon;
+      }
+
+      function toggleTheme() {
+        darkTheme = !darkTheme;
+        document.body.classList.toggle('light-theme', !darkTheme);
+        applyThemeToggleUI();
+      }
+
+      themeBtn.addEventListener('click', toggleTheme);
+      authThemeBtn.addEventListener('click', toggleTheme);
+
+    });
+
+    /* ============================================================
+       REAL TEST-TAKING FLOW
+       A test only counts as "attempted" (and only moves the Tests
+       Attempted stat / delta) once the student actually answers and
+       submits it here — never on modal open alone, and never past
+       that class's real testsTotal.
+       ============================================================ */
+    const quizQuestions = [
+      { type: 'mcq', q: "Which planet is known as the Red Planet?", options: ["Earth", "Mars", "Jupiter", "Venus"], correct: 1 },
+      { type: 'mcq', q: "What is the chemical symbol for water?", options: ["O2", "H2O", "CO2", "NaCl"], correct: 1 },
+      { type: 'mcq', q: "How many sides does a hexagon have?", options: ["5", "6", "7", "8"], correct: 1 },
+      { type: 'mcq', q: "Who wrote 'Romeo and Juliet'?", options: ["Charles Dickens", "William Shakespeare", "Mark Twain", "Jane Austen"], correct: 1 },
+      { type: 'mcq', q: "What is the capital of Pakistan?", options: ["Karachi", "Lahore", "Islamabad", "Peshawar"], correct: 2 },
+      { type: 'short', q: "In 2-3 sentences, explain why plants need sunlight." },
+      { type: 'long', q: "Explain in detail the process of the water cycle and why it matters for life on Earth." }
+    ];
+    let currentTestAnswers = [];
+
+    /* A test is only ever opened through here. If the real scheduled time
+       for this class's test hasn't arrived yet, it never opens — the
+       student only ever sees the locked popup with the real unlock time. */
+    function handleStartTestClick() {
+      if (!isTestUnlocked(currentSelectedClass)) {
+        showTestLockedPopup(currentSelectedClass);
+        return;
+      }
+      resetTestModal();
+      new bootstrap.Modal(document.getElementById('testModal')).show();
+    }
+
+    function resetTestModal() {
+      const data = classDatasets[currentSelectedClass];
+      const bodyEl = document.getElementById('testModalBody');
+      const footEl = document.getElementById('testModalFooter');
+      const maxedOut = data.testsAttempted >= data.testsTotal;
+
+      bodyEl.innerHTML = `
+        <div class="text-center">
+          <i class="fa-solid fa-stopwatch text-warning display-4 mb-3"></i>
+          <h6>${maxedOut ? "You've completed every test available for this class!" : "Are you ready to start the test?"}</h6>
+          <p class="text-muted small mb-0">${maxedOut ? `All ${data.testsTotal}/${data.testsTotal} tests attempted.` : `${quizQuestions.filter(q=>q.type==='mcq').length} MCQs + short &amp; long questions • completing it moves your real progress.`}</p>
+        </div>
+      `;
+      footEl.innerHTML = `
+        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+        ${maxedOut ? '' : '<button type="button" class="btn btn-gradient-sm px-4" onclick="renderTestQuestions()">Begin Now</button>'}
+      `;
+    }
+
+    function renderTestQuestions() {
+      currentTestAnswers = new Array(quizQuestions.length).fill(null);
+      let html = '<div class="text-start">';
+      quizQuestions.forEach((item, qi) => {
+        const typeLabel = item.type === 'mcq' ? 'MCQ' : (item.type === 'short' ? 'Short Question' : 'Long Question');
+        html += `<div class="mb-4"><p class="fw-semibold mb-2">${qi + 1}. <span class="badge bg-purple text-purple me-1" style="font-size:0.65rem;">${typeLabel}</span><br class="d-md-none">${item.q}</p>`;
+        if (item.type === 'mcq') {
+          item.options.forEach((opt, oi) => {
+            html += `
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="testQ${qi}" id="testQ${qi}_${oi}" onchange="currentTestAnswers[${qi}] = ${oi}">
+                <label class="form-check-label" for="testQ${qi}_${oi}">${opt}</label>
+              </div>
+            `;
+          });
+        } else {
+          const rows = item.type === 'short' ? 2 : 5;
+          html += `<textarea class="form-control themed-field" rows="${rows}" placeholder="Type your answer here..." oninput="currentTestAnswers[${qi}] = this.value"></textarea>`;
+        }
+        html += `</div>`;
+      });
+      html += '</div>';
+      document.getElementById('testModalBody').innerHTML = html;
+      document.getElementById('testModalFooter').innerHTML = `
+        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-gradient-sm px-4" onclick="submitCurrentTest()">Submit Test</button>
+      `;
+    }
+
+    function submitCurrentTest() {
+      const mcqs = quizQuestions.filter(q => q.type === 'mcq');
+      let score = 0;
+      quizQuestions.forEach((item, qi) => { if (item.type === 'mcq' && currentTestAnswers[qi] === item.correct) score++; });
+      const writtenAnswered = quizQuestions.filter((item, qi) => item.type !== 'mcq' && currentTestAnswers[qi]).length;
+      const writtenTotal = quizQuestions.filter(q => q.type !== 'mcq').length;
+
+      const data = classDatasets[currentSelectedClass];
+      if (data.testsAttempted < data.testsTotal) data.testsAttempted++;
+
+      /* The only place chaptersDone (and therefore all real progress %)
+         moves — tied to the subject this test title belongs to, capped
+         at that subject's real chaptersTotal. */
+      const relatedSubject = data.subjects.find(s => data.testTitle.includes(s.name)) || data.subjects[0];
+      if (relatedSubject) relatedSubject.chaptersDone = Math.min(relatedSubject.chaptersTotal, relatedSubject.chaptersDone + 1);
+
+      document.getElementById('testModalBody').innerHTML = `
+        <div class="text-center">
+          <i class="fa-solid fa-circle-check text-success display-4 mb-3"></i>
+          <h6>Test Completed!</h6>
+          <p class="text-muted small mb-0">You scored ${score}/${mcqs.length} on the MCQs, and submitted ${writtenAnswered}/${writtenTotal} short &amp; long answers for review. Your Tests Attempted count has been updated for real.</p>
+        </div>
+      `;
+      document.getElementById('testModalFooter').innerHTML = `
+        <button type="button" class="btn btn-gradient-sm px-4" data-bs-dismiss="modal">Done</button>
+      `;
+
+      logActivity('test', `Attempted "${data.testTitle}" • scored ${score}/${mcqs.length} on MCQs`);
+      renderStatsForClass(currentSelectedClass);
+      renderUpcomingTest(currentSelectedClass);
+      renderAchievements(currentSelectedClass);
+      updateNotifBadge();
+    }
+  </script>
+</body>
+</html>
