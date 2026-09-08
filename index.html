@@ -92,11 +92,6 @@
       max-width: 440px;
       position: relative;
     }
-    #authOverlayCloseBtn {
-      position: absolute;
-      top: -14px;
-      right: -14px;
-    }
 
     /* ============ GUEST LOCK: visually locks a real widget (blurs its
        actual, still-live content) instead of destroying or faking it.
@@ -1220,42 +1215,28 @@
         gap: 8px;
       }
 
-      #mobileMenuBtn {
-        flex: 0 0 auto;
-        width: 38px;
-        height: 38px;
-        font-size: 0.85rem;
-      }
+      /* Row 1: hamburger on the left, every icon (theme, bell, login,
+         profile) grouped together on the right — the normal place icons
+         live on any real site header, not scattered onto their own row. */
+      #mobileMenuBtn { order: 1; flex: 0 0 auto; width: 38px; height: 38px; font-size: 0.85rem; }
+      header#topHeader #headerIconsRow { order: 2; margin-left: auto !important; gap: 10px !important; }
 
+      /* Row 2: the search bar alone, full width, nothing else sharing
+         the line with it. */
       header#topHeader .search-box-wrapper {
-        flex: 1 1 auto;
+        order: 3;
+        flex: 1 1 100%;
         min-width: 0;
         max-width: none !important;
       }
       header#topHeader .search-bar { width: 100%; }
       header#topHeader .search-bar input { min-width: 0; }
 
-      /* flex-basis: 100% forces this row of icons onto its own new line
-         below the menu-toggle/search row, instead of squeezing in beside
-         them. */
-      header#topHeader #headerIconsRow {
-        flex: 1 1 100%;
-        margin-left: 0 !important;
-        gap: 10px !important;
-      }
       header#topHeader #headerIconsRow .shortcut-badge { display: none; }
       header#topHeader .action-btn {
         width: 36px;
         height: 36px;
         font-size: 0.8rem;
-      }
-
-      /* Theme toggle + bell stay put on the left of this second row (their
-         normal document order). The profile cluster gets its own
-         auto-margin, which eats all remaining space on that row and
-         shoves it — and only it — over to the far right. */
-      header#topHeader #headerProfileCluster {
-        margin-left: auto !important;
       }
 
       /* Profile becomes just the avatar on mobile — name/class text and
@@ -1451,10 +1432,6 @@
        password logs back in, and logging out sends you back here. ============ -->
   <div id="authScreen" style="display:none;">
     <div class="auth-card glass-panel p-4 p-md-5">
-      <!-- Real close: only rendered/clickable when browsing as a guest is
-           actually allowed (i.e. this overlay was opened voluntarily, not
-           because a locked feature is still waiting on login). -->
-      <button type="button" class="action-btn rounded-circle" id="authOverlayCloseBtn" title="Close" onclick="closeAuthOverlay()" style="width:36px; height:36px; display:none;"><i class="fa-solid fa-xmark"></i></button>
       <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
         <div class="d-flex align-items-center gap-3">
           <div class="sidebar-brand-icon">
@@ -1465,7 +1442,14 @@
             <small class="text-muted" style="font-size: 0.72rem;">Learn Better, Score Higher</small>
           </div>
         </div>
-        <button class="action-btn" id="authThemeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
+        <div class="d-flex align-items-center gap-2">
+          <button class="action-btn" id="authThemeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
+          <!-- Real close: only rendered/clickable when browsing as a guest is
+               actually allowed (i.e. this overlay was opened voluntarily, not
+               because a locked feature is still waiting on login). Sits inline
+               inside the card now, never overflowing past its edge. -->
+          <button type="button" class="action-btn" id="authOverlayCloseBtn" title="Close" onclick="closeAuthOverlay()" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
       <p class="text-muted small mb-3" id="authOverlayReasonText" style="display:none;"></p>
 
@@ -1757,9 +1741,11 @@
 
         <!-- Guest state: real Login / Sign up entry point. Only shown when
              nobody is signed in — opens the same real auth forms used at
-             signup, not a placeholder link. -->
-        <button class="btn btn-gradient-sm" id="headerLoginBtn" style="display:none;" onclick="openAuthOverlay('login')">
-          <i class="fa-solid fa-right-to-bracket me-1"></i> Login / Sign up
+             signup. Same icon-button size/shape as the other header icons
+             so it sits in the row properly instead of standing out as an
+             oversized text pill. -->
+        <button class="action-btn" id="headerLoginBtn" style="display:none; background: var(--gradient-btn); border-color: transparent;" onclick="openAuthOverlay('login')" title="Login / Sign up">
+          <i class="fa-solid fa-right-to-bracket"></i>
         </button>
 
         <div class="d-flex align-items-center gap-2 ps-2 border-start border-white border-opacity-10 position-relative" id="headerProfileCluster" style="cursor: pointer;" onclick="toggleHeaderProfileMini(event)">
@@ -4707,7 +4693,7 @@
       let darkTheme = true;
 
       function applyThemeToggleUI() {
-        const icon = darkTheme ? '<i class="fa-regular fa-moon"></i>' : '<i class="fa-regular fa-sun text-warning"></i>';
+        const icon = darkTheme ? '<i class="fa-regular fa-moon"></i>' : '<i class="fa-regular fa-sun"></i>';
         themeBtn.innerHTML = icon;
         authThemeBtn.innerHTML = icon;
         if (settingsThemeSwitch) settingsThemeSwitch.checked = darkTheme;
