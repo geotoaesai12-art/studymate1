@@ -64,19 +64,67 @@
       color: var(--page-text);
     }
 
-    /* ============ AUTH SCREEN (Signup / Login) ============ */
+    /* ============ AUTH SCREEN (Signup / Login) ============
+       FIX: this used to be the only thing rendered until a session
+       existed, blocking the whole site behind a login wall. It is now
+       a floating overlay (position: fixed, its own opaque background)
+       that sits on top of the app shell — the app shell is visible and
+       browsable underneath at all times, and this overlay only appears
+       when the guest explicitly opens Login/Sign up, or tries to use a
+       feature that genuinely needs an account. It can always be closed
+       with the × to go on browsing as a guest. ============ */
     #authScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
       min-height: 100vh;
       width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
+      z-index: 2000;
+      background: var(--bg-gradient);
+      overflow-y: auto;
     }
     #authScreen .auth-card {
       width: 100%;
       max-width: 440px;
+      position: relative;
     }
+    #authOverlayCloseBtn {
+      position: absolute;
+      top: -14px;
+      right: -14px;
+    }
+
+    /* ============ GUEST LOCK: visually locks a real widget (blurs its
+       actual, still-live content) instead of destroying or faking it.
+       The underlying numbers are untouched in the DOM — logging in just
+       removes the badge and the real values are already there. ============ */
+    .guest-locked { position: relative; }
+    .guest-locked > *:not(.guest-lock-badge) {
+      filter: blur(6px);
+      user-select: none;
+      pointer-events: none;
+    }
+    .guest-lock-badge {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 4px;
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-align: center;
+      background: rgba(10, 6, 30, 0.4);
+      border-radius: inherit;
+      z-index: 3;
+    }
+    .guest-lock-badge i { font-size: 1.1rem; }
     body.light-theme #authScreen .text-muted { color: #64748b !important; }
 
     .glass-panel {
@@ -1401,8 +1449,12 @@
        localStorage ('studymate_users_v1' for accounts, 'studymate_session_v1'
        for who is currently logged in) so returning with the same email +
        password logs back in, and logging out sends you back here. ============ -->
-  <div id="authScreen">
+  <div id="authScreen" style="display:none;">
     <div class="auth-card glass-panel p-4 p-md-5">
+      <!-- Real close: only rendered/clickable when browsing as a guest is
+           actually allowed (i.e. this overlay was opened voluntarily, not
+           because a locked feature is still waiting on login). -->
+      <button type="button" class="action-btn rounded-circle" id="authOverlayCloseBtn" title="Close" onclick="closeAuthOverlay()" style="width:36px; height:36px; display:none;"><i class="fa-solid fa-xmark"></i></button>
       <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
         <div class="d-flex align-items-center gap-3">
           <div class="sidebar-brand-icon">
@@ -1415,6 +1467,7 @@
         </div>
         <button class="action-btn" id="authThemeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
       </div>
+      <p class="text-muted small mb-3" id="authOverlayReasonText" style="display:none;"></p>
 
       <!-- LOGIN FORM -->
       <div id="loginFormWrap">
@@ -1563,7 +1616,7 @@
     </div>
   </div>
 
-  <div id="appShell" style="display:none;">
+  <div id="appShell">
 
   <!-- Mobile Sidebar Backdrop -->
   <div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop"></div>
@@ -1643,10 +1696,22 @@
       </a>
     </div>
 
+    <!-- Guest CTA: real state — shown only while browsing without an
+         account. Premium and account-only features live behind Login. -->
+    <div class="upgrade-box p-3 my-3 text-center" id="sidebarGuestBox" style="display:none;">
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+        <i class="fa-solid fa-lock text-warning"></i>
+        <span class="fw-bold fs-6">Sign in to unlock more</span>
+      </div>
+      <p class="text-muted small mb-3" style="font-size: 0.75rem;">Tests, bookmarks, progress, achievements &amp; results need a real account.</p>
+      <button class="btn btn-gradient-sm w-100" onclick="openAuthOverlay('login')">Login / Sign up <i class="fa-solid fa-arrow-right ms-1"></i></button>
+    </div>
+
     <!-- Upgrade Box: real state — shows the actual paid plans until the
          student genuinely subscribes (stored in localStorage), then
-         switches to a real "Premium Member" badge instead of the pitch. -->
-    <div class="upgrade-box p-3 my-3 text-center" id="sidebarUpgradeBox">
+         switches to a real "Premium Member" badge instead of the pitch.
+         Only relevant to a logged-in student, so hidden for guests. -->
+    <div class="upgrade-box p-3 my-3 text-center" id="sidebarUpgradeBox" style="display:none;">
       <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
         <i class="fa-solid fa-crown text-warning"></i>
         <span class="fw-bold fs-6">Upgrade to Premium</span>
@@ -1655,9 +1720,10 @@
       <button class="btn btn-gradient-sm w-100" onclick="openPremiumModal()">Go Premium <i class="fa-solid fa-arrow-right ms-1"></i></button>
     </div>
 
-    <!-- Logout -->
-    <a href="#" id="logoutNavLink" class="nav-item-link text-danger" onclick="new bootstrap.Modal(document.getElementById('logoutConfirmModal')).show(); return false;">
-      <span><i class="fa-solid fa-right-from-bracket me-2"></i> Logout</span>
+    <!-- Logout / Login: real state — this link genuinely logs out a
+         signed-in student, or opens real Login/Sign up for a guest. -->
+    <a href="#" id="logoutNavLink" class="nav-item-link text-danger" onclick="handleLogoutNavClick(); return false;">
+      <span><i class="fa-solid fa-right-from-bracket me-2" id="logoutNavIcon"></i> <span id="logoutNavLabel">Logout</span></span>
     </a>
   </aside>
 
@@ -1687,6 +1753,13 @@
         <button class="action-btn position-relative" onclick="showSection('notifications')" title="Notifications">
           <i class="fa-regular fa-bell" id="notifBellIcon"></i>
           <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBellBadge" style="display:none; font-size: 0.6rem; padding: 3px 5px;"></span>
+        </button>
+
+        <!-- Guest state: real Login / Sign up entry point. Only shown when
+             nobody is signed in — opens the same real auth forms used at
+             signup, not a placeholder link. -->
+        <button class="btn btn-gradient-sm" id="headerLoginBtn" style="display:none;" onclick="openAuthOverlay('login')">
+          <i class="fa-solid fa-right-to-bracket me-1"></i> Login / Sign up
         </button>
 
         <div class="d-flex align-items-center gap-2 ps-2 border-start border-white border-opacity-10 position-relative" id="headerProfileCluster" style="cursor: pointer;" onclick="toggleHeaderProfileMini(event)">
@@ -1734,7 +1807,7 @@
           <!-- Top Stats Bar -->
           <div class="row g-3 mb-4">
             <div class="col-xl-3 col-sm-6" onclick="showSection('progress')" style="cursor: pointer;">
-              <div class="glass-card p-3 d-flex align-items-center justify-content-between">
+              <div class="glass-card p-3 d-flex align-items-center justify-content-between" id="topStatOverallCard">
                 <div>
                   <div class="circle-chart" id="circleChartSmall">
                     <span id="statOverall">72%</span>
@@ -1748,7 +1821,7 @@
             </div>
 
             <div class="col-xl-3 col-sm-6" onclick="showSection('chapters')" style="cursor: pointer;">
-              <div class="glass-card p-3 d-flex align-items-center gap-3">
+              <div class="glass-card p-3 d-flex align-items-center gap-3" id="topStatChaptersCard">
                 <div class="rounded-3 p-3 text-emerald" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
                   <i class="fa-solid fa-book-bookmark fs-4"></i>
                 </div>
@@ -1761,7 +1834,7 @@
             </div>
 
             <div class="col-xl-3 col-sm-6" onclick="showSection('tests')" style="cursor: pointer;">
-              <div class="glass-card p-3 d-flex align-items-center gap-3">
+              <div class="glass-card p-3 d-flex align-items-center gap-3" id="topStatTestsCard">
                 <div class="rounded-3 p-3 text-indigo" style="background: rgba(99, 102, 241, 0.15); color: #6366f1;">
                   <i class="fa-solid fa-shield-halved fs-4"></i>
                 </div>
@@ -1877,7 +1950,7 @@
           <!-- Bottom Widgets Grid -->
           <div class="row g-3">
             <div class="col-md-4">
-              <div class="glass-card p-3 h-100" onclick="showSection('progress')" style="cursor: pointer;">
+              <div class="glass-card p-3 h-100" onclick="showSection('progress')" style="cursor: pointer;" id="progressOverviewWidget">
                 <h6 class="fw-bold mb-3">Progress Overview</h6>
                 <div class="d-flex align-items-center gap-3">
                   <div class="big-circle-chart" id="circleChartBig">
@@ -1897,7 +1970,7 @@
             </div>
 
             <div class="col-md-4">
-              <div class="glass-card p-3 h-100" onclick="showSection('achievements')" style="cursor: pointer;">
+              <div class="glass-card p-3 h-100" onclick="showSection('achievements')" style="cursor: pointer;" id="achievementsPreviewWidget">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <h6 class="fw-bold mb-0">Achievements</h6>
                   <span class="text-primary small">View All →</span>
@@ -3375,7 +3448,18 @@
       }
     });
 
+    /* Real account-only sections: a guest gets sent to a real Login/Sign up
+       prompt instead of ever seeing these — nothing here is a client-side
+       decoration; every entry point (sidebar link, quick-access icon, or
+       dashboard widget click) funnels through this same check. */
+    const GATED_SECTIONS = ['tests', 'results', 'bookmarks', 'progress', 'achievements', 'profile', 'settings'];
+
     function showSection(sectionKey) {
+      if (GATED_SECTIONS.includes(sectionKey) && !getSessionUser()) {
+        openAuthOverlay('login', "Sign in to see your real tests, bookmarks, progress, achievements & results.");
+        return;
+      }
+
       /* FIX: on mobile, picking a section should close the slide-out menu
          instead of leaving it open over the new page. */
       if (window.innerWidth <= 991 && document.getElementById('sidebar').classList.contains('show')) {
@@ -3936,6 +4020,10 @@
     }
 
     function toggleBookmarkCurrentPage() {
+      if (!getSessionUser()) {
+        openAuthOverlay('login', 'Sign in to bookmark pages.');
+        return;
+      }
       const key = currentBookmarkKey();
       const idx = bookmarks.findIndex(b => b.key === key);
 
@@ -4223,16 +4311,94 @@
       document.getElementById('signupErrorBox').style.display = 'none';
     }
 
-    function showAuthScreen() {
+    /* ============================================================
+       REAL GUEST BROWSING
+       The site opens straight into the app for everyone — no forced
+       login wall. openAuthOverlay() is the one real entry point into
+       Login/Sign up: it's called when a guest taps the header/sidebar
+       Login button, OR when a guest tries to actually use an
+       account-only feature (see GATED_SECTIONS in showSection() and
+       the checks in handleStartTestClick()/toggleBookmarkCurrentPage()).
+       A guest can always dismiss it with the × and keep browsing —
+       it never blocks the rest of the site. ============ */
+    function openAuthOverlay(which, reason) {
+      showAuthForm(which || 'login');
+      const reasonEl = document.getElementById('authOverlayReasonText');
+      if (reason) {
+        reasonEl.innerText = reason;
+        reasonEl.style.display = '';
+      } else {
+        reasonEl.style.display = 'none';
+      }
+      document.getElementById('authOverlayCloseBtn').style.display = '';
       document.getElementById('authScreen').style.display = 'flex';
-      document.getElementById('appShell').style.display = 'none';
+    }
+
+    function closeAuthOverlay() {
+      document.getElementById('authScreen').style.display = 'none';
+    }
+
+    /* GUEST_LOCK_WIDGETS: real dashboard widgets that show tests/
+       bookmarks/progress/achievements/results data. Their real markup
+       and IDs are never touched — this only blurs them and drops a
+       "Sign in to view" badge on top until a real session exists. */
+    const GUEST_LOCK_WIDGETS = ['topStatOverallCard', 'topStatChaptersCard', 'topStatTestsCard', 'progressOverviewWidget', 'achievementsPreviewWidget'];
+
+    function setGuestLock(containerId, locked) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.classList.toggle('guest-locked', locked);
+      let badge = el.querySelector('.guest-lock-badge');
+      if (locked) {
+        if (!badge) {
+          badge = document.createElement('div');
+          badge.className = 'guest-lock-badge';
+          badge.innerHTML = '<i class="fa-solid fa-lock"></i><span>Sign in to view</span>';
+          el.appendChild(badge);
+        }
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+
+    /* Switches the header/sidebar chrome between "real logged-in
+       student" and "real guest" state. Nothing here is faked either
+       way — a guest genuinely sees no account UI, and a logged-in
+       student genuinely sees their own. */
+    function renderAuthChrome(isLoggedIn) {
+      document.getElementById('headerLoginBtn').style.display = isLoggedIn ? 'none' : '';
+      document.getElementById('headerProfileCluster').style.display = isLoggedIn ? '' : 'none';
+      document.getElementById('sidebarGuestBox').style.display = isLoggedIn ? 'none' : '';
+      document.getElementById('sidebarUpgradeBox').style.display = isLoggedIn ? '' : 'none';
+      document.getElementById('logoutNavIcon').className = isLoggedIn ? 'fa-solid fa-right-from-bracket me-2' : 'fa-solid fa-right-to-bracket me-2';
+      document.getElementById('logoutNavLabel').innerText = isLoggedIn ? 'Logout' : 'Login';
+      GUEST_LOCK_WIDGETS.forEach(id => setGuestLock(id, !isLoggedIn));
+    }
+
+    function handleLogoutNavClick() {
+      if (getSessionUser()) {
+        new bootstrap.Modal(document.getElementById('logoutConfirmModal')).show();
+      } else {
+        openAuthOverlay('login');
+      }
+    }
+
+    /* Real guest landing state: the app shell is fully visible and
+       browsable (subjects, chapters, book reader, sticky notes), only
+       the account-only widgets/sections are visually locked. */
+    function enterGuestMode() {
+      closeAuthOverlay();
+      renderAuthChrome(false);
+      document.getElementById('dashGreetingName').innerText = 'Guest';
+      document.getElementById('recentActivityList').innerHTML = '<p class="text-muted small mb-0">Sign in to see your real activity here.</p>';
+      switchClass(currentSelectedClass || 'Class 10');
     }
 
     /* Populates the profile / header UI with the logged-in user's real
        details and boots up the dashboard for them. */
     function enterApp(user) {
-      document.getElementById('authScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = '';
+      closeAuthOverlay();
+      renderAuthChrome(true);
 
       const username = user.email.split('@')[0];
       document.getElementById('topHeaderUserName').innerText = user.name;
@@ -4325,10 +4491,11 @@
         logActivity('logout', `${currentUser.name} logged out`);
       }
       clearSession();
-      document.getElementById('loginForm').reset();
-      document.getElementById('signupForm').reset();
-      showAuthForm('login');
-      showAuthScreen();
+      /* Real reload: this app keeps a signed-in student's progress,
+         bookmarks and activity in page memory while they're using it.
+         Reloading is what guarantees the next guest genuinely starts
+         clean instead of glimpsing the previous student's real data. */
+      location.reload();
     }
 
     /* ============================================================
@@ -4393,10 +4560,7 @@
       }
       logActivity('logout', `${sessionUser.name} deactivated their account`);
       clearSession();
-      document.getElementById('loginForm').reset();
-      document.getElementById('signupForm').reset();
-      showAuthForm('login');
-      showAuthScreen();
+      location.reload();
     }
 
     /* Permanent delete: real removal from the users list. Requires
@@ -4421,11 +4585,7 @@
       errorBox.style.display = 'none';
       document.getElementById('deleteAccountConfirmEmail').value = '';
       bootstrap.Modal.getInstance(document.getElementById('deleteAccountModal')).hide();
-
-      document.getElementById('loginForm').reset();
-      document.getElementById('signupForm').reset();
-      showAuthForm('signup');
-      showAuthScreen();
+      location.reload();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -4433,7 +4593,7 @@
       if (sessionUser) {
         enterApp(sessionUser);
       } else {
-        showAuthScreen();
+        enterGuestMode();
       }
 
       const classesBtn = document.getElementById('classesDropdownBtn');
@@ -4587,6 +4747,10 @@
        for this class's test hasn't arrived yet, it never opens — the
        student only ever sees the locked popup with the real unlock time. */
     function handleStartTestClick() {
+      if (!getSessionUser()) {
+        openAuthOverlay('login', 'Sign in to attempt a real test.');
+        return;
+      }
       if (!isTestUnlocked(currentSelectedClass)) {
         showTestLockedPopup(currentSelectedClass);
         return;
