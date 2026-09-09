@@ -78,11 +78,12 @@
       top: 0;
       left: 0;
       min-height: 100vh;
+      min-height: 100dvh;
       width: 100%;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
-      padding: 24px;
+      padding: 40px 24px calc(40px + env(safe-area-inset-bottom, 0px));
       z-index: 2000;
       background: var(--bg-gradient);
       overflow-y: auto;
@@ -90,6 +91,7 @@
     #authScreen .auth-card {
       width: 100%;
       max-width: 440px;
+      margin: auto 0;
       position: relative;
     }
 
@@ -1239,16 +1241,6 @@
         font-size: 0.8rem;
       }
 
-      /* Profile becomes just the avatar on mobile — name/class text and
-         the divider line next to it are dropped to keep the row compact. */
-      header#topHeader #topHeaderUserName,
-      header#topHeader #topUserClass {
-        display: none;
-      }
-      header#topHeader #headerProfileCluster.border-start {
-        border-left: none !important;
-        padding-left: 0 !important;
-      }
       header#topHeader #topHeaderUserAvatar {
         width: 34px !important;
         height: 34px !important;
@@ -1607,7 +1599,7 @@
 
   <!-- Sidebar Navigation -->
   <aside class="sidebar p-3 d-flex flex-column" id="sidebar">
-    <div class="d-flex align-items-center gap-3 px-2 mb-4">
+    <div class="d-flex align-items-center gap-3 px-2 mb-3">
       <div class="sidebar-brand-icon">
         <i class="fa-solid fa-graduation-cap text-white fs-5"></i>
       </div>
@@ -1615,6 +1607,21 @@
         <h5 class="fw-bold mb-0 text-white">StudyMate</h5>
         <small class="text-muted" style="font-size: 0.72rem;">Learn Better, Score Higher</small>
       </div>
+    </div>
+
+    <!-- Utility row: Theme toggle, Notifications, and Login/Sign up now live
+         here (reached via the hamburger menu on mobile, always visible in
+         the permanent sidebar on desktop) instead of crowding the header
+         row next to the search bar. -->
+    <div class="d-flex align-items-center gap-2 px-2 mb-4">
+      <button class="action-btn" id="themeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
+      <button class="action-btn position-relative" onclick="showSection('notifications')" title="Notifications">
+        <i class="fa-regular fa-bell" id="notifBellIcon"></i>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBellBadge" style="display:none; font-size: 0.6rem; padding: 3px 5px;"></span>
+      </button>
+      <button class="action-btn" id="headerLoginBtn" style="display:none; background: var(--gradient-btn); border-color: transparent;" onclick="openAuthOverlay('login')" title="Login / Sign up">
+        <i class="fa-solid fa-right-to-bracket"></i>
+      </button>
     </div>
 
     <!-- Nav List -->
@@ -1733,31 +1740,20 @@
       </div>
 
       <div class="d-flex align-items-center gap-3 ms-auto" id="headerIconsRow">
-        <button class="action-btn" id="themeToggleBtn" title="Toggle Theme"><i class="fa-regular fa-moon"></i></button>
-        <button class="action-btn position-relative" onclick="showSection('notifications')" title="Notifications">
-          <i class="fa-regular fa-bell" id="notifBellIcon"></i>
-          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notifBellBadge" style="display:none; font-size: 0.6rem; padding: 3px 5px;"></span>
-        </button>
-
-        <!-- Guest state: real Login / Sign up entry point. Only shown when
-             nobody is signed in — opens the same real auth forms used at
-             signup. Same icon-button size/shape as the other header icons
-             so it sits in the row properly instead of standing out as an
-             oversized text pill. -->
-        <button class="action-btn" id="headerLoginBtn" style="display:none; background: var(--gradient-btn); border-color: transparent;" onclick="openAuthOverlay('login')" title="Login / Sign up">
-          <i class="fa-solid fa-right-to-bracket"></i>
-        </button>
-
-        <div class="d-flex align-items-center gap-2 ps-2 border-start border-white border-opacity-10 position-relative" id="headerProfileCluster" style="cursor: pointer;" onclick="toggleHeaderProfileMini(event)">
+        <div class="position-relative" id="headerProfileCluster" style="cursor: pointer;" onclick="toggleHeaderProfileMini(event)">
           <img id="topHeaderUserAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Ahmed Khan" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
-          <div>
+          <!-- Name/class are intentionally never shown in the header itself
+               anymore — only inside the mini preview below, which opens on
+               a click. These two stay in the DOM (hidden) purely so the
+               existing name/class read/write logic keeps working. -->
+          <div style="display:none;">
             <h6 class="mb-0 fw-bold fs-6" id="topHeaderUserName">Ahmed Khan</h6>
             <small class="text-muted d-block" id="topUserClass" style="font-size: 0.72rem;">Class 10 <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.6rem;"></i></small>
           </div>
 
-          <!-- Mini profile preview: opens ONLY on the header chevron/avatar
-               click — shows just the photo + name, nothing else (no
-               settings, no full details). Clicking "View Full Profile"
+          <!-- Mini profile preview: opens ONLY on the header avatar click —
+               shows the real photo + name + class together, nothing else
+               (no settings, no full details). Clicking "View Full Profile"
                below — or the Profile link in the sidebar — is what opens
                the complete profile page. -->
           <div class="glass-card p-3 text-center" id="headerProfileMini" style="display:none; position:absolute; top:calc(100% + 10px); right:0; width:200px; z-index:1100; background:rgba(15,10,36,0.97);">
@@ -1971,14 +1967,14 @@
               <div class="glass-card p-3 h-100">
                 <h6 class="fw-bold mb-3">Quick Access</h6>
                 <div class="row g-2 text-center">
-                  <div class="col-3" onclick="showSection('stickynotes')"><div class="quick-icon-btn"><i class="fa-solid fa-sticky-note text-warning"></i><small class="d-block mt-1" style="font-size:0.65rem;">Notes</small></div></div>
-                  <div class="col-3" onclick="showSection('chapters')"><div class="quick-icon-btn"><i class="fa-solid fa-circle-question text-info"></i><small class="d-block mt-1" style="font-size:0.65rem;">Solutions</small></div></div>
+                  <div class="col-3" onclick="showSection('stickynotes')"><div class="quick-icon-btn"><i class="fa-solid fa-sticky-note text-warning"></i><small class="d-block mt-1" style="font-size:0.65rem;">Sticky Notes</small></div></div>
+                  <div class="col-3" onclick="showSection('chapters')"><div class="quick-icon-btn"><i class="fa-solid fa-circle-question text-info"></i><small class="d-block mt-1" style="font-size:0.65rem;">Chapters</small></div></div>
                   <div class="col-3" onclick="showSection('tests')"><div class="quick-icon-btn"><i class="fa-solid fa-list-check text-primary"></i><small class="d-block mt-1" style="font-size:0.65rem;">MCQs</small></div></div>
                   <div class="col-3" onclick="showSection('tests')"><div class="quick-icon-btn"><i class="fa-solid fa-file-pen text-success"></i><small class="d-block mt-1" style="font-size:0.65rem;">Tests</small></div></div>
-                  <div class="col-3" onclick="showSection('bookmarks')"><div class="quick-icon-btn"><i class="fa-solid fa-bookmark text-danger"></i><small class="d-block mt-1" style="font-size:0.65rem;">Saved</small></div></div>
-                  <div class="col-3" onclick="showSection('chapters')"><div class="quick-icon-btn"><i class="fa-solid fa-clock text-secondary"></i><small class="d-block mt-1" style="font-size:0.65rem;">Recent</small></div></div>
-                  <div class="col-3" onclick="showSection('results')"><div class="quick-icon-btn"><i class="fa-solid fa-chart-pie text-purple"></i><small class="d-block mt-1" style="font-size:0.65rem;">Report</small></div></div>
-                  <div class="col-3" onclick="showSection('achievements')"><div class="quick-icon-btn"><i class="fa-solid fa-trophy text-warning"></i><small class="d-block mt-1" style="font-size:0.65rem;">Badges</small></div></div>
+                  <div class="col-3" onclick="showSection('bookmarks')"><div class="quick-icon-btn"><i class="fa-solid fa-bookmark text-danger"></i><small class="d-block mt-1" style="font-size:0.65rem;">Bookmark</small></div></div>
+                  <div class="col-3" onclick="showSection('recentactivity')"><div class="quick-icon-btn"><i class="fa-solid fa-clock text-secondary"></i><small class="d-block mt-1" style="font-size:0.65rem;">Recent</small></div></div>
+                  <div class="col-3" onclick="showSection('results')"><div class="quick-icon-btn"><i class="fa-solid fa-chart-pie text-purple"></i><small class="d-block mt-1" style="font-size:0.65rem;">Result</small></div></div>
+                  <div class="col-3" onclick="showSection('achievements')"><div class="quick-icon-btn"><i class="fa-solid fa-trophy text-warning"></i><small class="d-block mt-1" style="font-size:0.65rem;">Achievements</small></div></div>
                 </div>
               </div>
             </div>
@@ -3191,6 +3187,36 @@
       }).join('');
     }
 
+    /* Full Recent Activity page: reuses the exact same real store as the
+       dashboard's Recent Activity widget, just without the 5-item cap. */
+    function renderFullActivityList() {
+      const container = document.getElementById('fullActivityList');
+      if (!container) return;
+      let log = [];
+      try {
+        const raw = localStorage.getItem('studymate_activity_v1');
+        if (raw) log = JSON.parse(raw);
+      } catch (e) { log = []; }
+
+      if (!log.length) {
+        container.innerHTML = `<div class="text-center text-muted py-5"><i class="fa-solid fa-clock display-5 mb-3 d-block opacity-50"></i>No activity yet — attempt a test or read a chapter to see your real activity here.</div>`;
+        return;
+      }
+
+      container.innerHTML = log.map(item => {
+        const meta = activityIcons[item.type] || activityIcons.login;
+        return `
+          <div class="glass-card p-3 d-flex align-items-center gap-3">
+            <div class="section-icon-chip ${meta.chip}"><i class="fa-solid ${meta.icon}"></i></div>
+            <div class="flex-grow-1">
+              <p class="mb-0 fw-semibold" style="font-size: 0.85rem;">${item.text}</p>
+              <small class="text-muted" style="font-size: 0.72rem;">${relativeTime(item.ts)}</small>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     /* ============================================================
        REAL ACHIEVEMENTS
        Every badge's earned/locked state is computed live from real
@@ -3438,7 +3464,7 @@
        prompt instead of ever seeing these — nothing here is a client-side
        decoration; every entry point (sidebar link, quick-access icon, or
        dashboard widget click) funnels through this same check. */
-    const GATED_SECTIONS = ['tests', 'results', 'bookmarks', 'progress', 'achievements', 'profile', 'settings'];
+    const GATED_SECTIONS = ['tests', 'results', 'bookmarks', 'progress', 'achievements', 'profile', 'settings', 'recentactivity'];
 
     function showSection(sectionKey) {
       if (GATED_SECTIONS.includes(sectionKey) && !getSessionUser()) {
@@ -3630,6 +3656,45 @@
           <div class="row g-3" id="stickyNotesList"></div>
         `;
         renderStickyNotesList();
+      }
+      else if(sectionKey === 'results') {
+        const cst = getClassStats(currentSelectedClass);
+        const data = classDatasets[currentSelectedClass];
+        const log = getScoreLog()[currentSelectedClass];
+        const avgPct = (log && log.possible > 0) ? Math.round((log.correct / log.possible) * 100) : null;
+        titleEl.innerHTML = `<i class="fa-solid fa-chart-pie me-2 text-purple"></i> Result`;
+        bodyEl.innerHTML = `
+          <p class="text-muted small mb-3">Your real result summary for ${currentSelectedClass} — updates the moment you actually attempt a test.</p>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="glass-card p-3 text-center">
+                <h3 class="fw-bold mb-0">${avgPct === null ? '—' : avgPct + '%'}</h3>
+                <small class="text-muted">Average Score</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass-card p-3 text-center">
+                <h3 class="fw-bold mb-0">${data.testsAttempted}/${data.testsTotal}</h3>
+                <small class="text-muted">Tests Attempted</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="glass-card p-3 text-center">
+                <h3 class="fw-bold mb-0">${cst.overallPct}%</h3>
+                <small class="text-muted">Overall Progress</small>
+              </div>
+            </div>
+          </div>
+          ${avgPct === null ? `<div class="text-center text-muted py-5"><i class="fa-solid fa-chart-pie display-5 mb-3 d-block opacity-50"></i>No test results yet — attempt a test to see your real result here.</div>` : ''}
+        `;
+      }
+      else if(sectionKey === 'recentactivity') {
+        titleEl.innerHTML = `<i class="fa-solid fa-clock me-2 text-secondary"></i> Recent Activity`;
+        bodyEl.innerHTML = `
+          <p class="text-muted small mb-3">Every real action you've taken recently — logins, tests, chapters read, bookmarks — in one place.</p>
+          <div class="d-flex flex-column gap-3" id="fullActivityList"></div>
+        `;
+        renderFullActivityList();
       }
       else {
         titleEl.innerText = sectionKey.toUpperCase();
